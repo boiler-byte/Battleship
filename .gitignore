@@ -1,0 +1,11 @@
+
+# Verzeichnisse ignorieren
+/origins/
+
+# Einzelne Dateien ignorieren
+fullmenu.html
+
+final-prompt.md
+prompt-imgs.md
+prompt-test.md
+todos.md
