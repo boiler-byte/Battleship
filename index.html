@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BATTLESHIP — Futuristic Naval Command</title>
+<title>BATTLESHIP - Schiffe versenken</title>
 <script src="SoundLibrary.js"></script>
 <script src="ComputerAI.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -101,6 +101,42 @@ body{
 .panel::after{
   content:''; position:absolute; right:0; bottom:0; width:44px; height:2px;
   background:linear-gradient(270deg,var(--cyan),transparent);
+}
+
+/* ============================================================
+   CONTINUE BANNER
+   ============================================================ */
+.continue-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px 18px;
+  margin-bottom:22px;
+  background:linear-gradient(150deg, rgba(56,232,255,.14), rgba(47,155,255,.06));
+  border:1px solid rgba(56,232,255,.42);
+  border-left:3px solid var(--cyan);
+  border-radius:3px;
+  flex-wrap:wrap;
+  animation:continueGlow 3s ease-in-out infinite;
+}
+@keyframes continueGlow{
+  0%,100%{ box-shadow:0 0 0 1px rgba(56,232,255,.18), 0 0 18px rgba(56,232,255,.10); }
+  50%    { box-shadow:0 0 0 1px rgba(56,232,255,.5),  0 0 28px rgba(56,232,255,.28); }
+}
+.continue-banner .cb-info{ flex:1 1 auto; min-width:180px; }
+.continue-banner .cb-title{
+  font-family:'Orbitron',sans-serif; font-weight:700; font-size:.76rem;
+  letter-spacing:.16em; text-transform:uppercase; color:#eafaff;
+  display:flex; align-items:center; gap:8px;
+}
+.continue-banner .cb-title i{ color:var(--cyan); font-size:1rem; }
+.continue-banner .cb-sub{
+  font-size:.82rem; color:var(--muted); margin-top:5px;
+  letter-spacing:.02em; line-height:1.4;
+}
+@media(max-width:520px){
+  .continue-banner{ padding:12px 14px; }
 }
 
 /* ============================================================
@@ -739,10 +775,26 @@ body{
   <section id="screen-setup" class="screen">
     <div class="setup-head">
       <h1 class="brand" style="font-size:clamp(1.6rem,6vw,2.9rem)">BATTLESHIP</h1>
-      <div class="sub">Futuristic Naval Command</div>
+      <div class="sub">Schife versenken</div>
     </div>
 
     <div class="panel pad">
+      <!-- NEU: Fortsetzen-Banner (nur wenn Save existiert) -->
+      <div id="continueBanner" class="continue-banner hidden">
+        <div class="cb-info">
+          <div class="cb-title"><i class="bi bi-clock-history"></i> Laufendes Spiel gefunden</div>
+          <div class="cb-sub" id="continueSub">—</div>
+        </div>
+        <div class="row gap">
+          <button class="btn primary" id="btnContinue">
+            <i class="bi bi-play-fill"></i> Fortsetzen
+          </button>
+          <button class="btn ghost" id="btnDiscardSave" title="Gespeicherten Spielstand löschen">
+            <i class="bi bi-trash"></i> Verwerfen
+          </button>
+        </div>
+      </div>
+
       <!-- NEU: Spielmodus -->
       <div class="section-label"><i class="bi bi-people-fill"></i> Spielmodus</div>
       <div class="player-mode-grid" id="playerModeCards"></div>
@@ -1065,6 +1117,7 @@ const state = {
   gridCols: 10,
   gridExpanded: false,
   templateExpanded: false,
+  playerModeExpanded: false,
   counts: {},
   players: [],
   current: 0,
@@ -1155,6 +1208,7 @@ function switchToCustomIfNeeded() {
 
 /* ============================================================
    5b) TIMER
+   (BUGFIX: currentElapsed hatte beim Pausieren doppelt gezählt)
    ============================================================ */
 function formatTime(ms){
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -1165,7 +1219,8 @@ function formatTime(ms){
 
 function currentElapsed(){
   if (state.timerPausedAt !== null){
-    return state.elapsedBefore + (state.startTime ? (state.timerPausedAt - state.startTime) : 0);
+    // pauseTimer() hat die aktive Phase bereits in elapsedBefore übernommen
+    return state.elapsedBefore;
   }
   return state.elapsedBefore + (state.startTime ? Date.now() - state.startTime : 0);
 }
@@ -1211,6 +1266,189 @@ function resumeTimer(){
 function stopTimer(){
   clearInterval(state.timerInterval);
   state.timerInterval = null;
+}
+
+/* ============================================================
+   5c) SAVE / LOAD (localStorage.battleshipGame)
+   ============================================================ */
+const SAVE_KEY = 'battleshipGame';
+const SAVE_VERSION = 1;
+
+function serializeState() {
+  const curShip = state.salvoShip;
+  const curPlayer = state.players[state.current];
+  let salvoShipIdx = -1;
+  if (curShip && curPlayer) salvoShipIdx = curPlayer.ships.indexOf(curShip);
+
+  return {
+    version: SAVE_VERSION,
+    timestamp: Date.now(),
+    templateId: state.templateId,
+    gridKey: state.gridKey,
+    gridRows: state.gridRows,
+    gridCols: state.gridCols,
+    counts: state.counts,
+    gameMode: state.gameMode,
+    salvoMode: state.salvoMode,
+    extraShotOnHit: state.extraShotOnHit,
+    blitzMode: state.blitzMode,
+    phase: state.phase,
+    current: state.current,
+    placementPlayer: state.placementPlayer,
+    elapsedBefore: currentElapsed(),
+    salvoShipIdx,
+    salvoShotsLeft: state.salvoShotsLeft,
+    salvoLocked: state.salvoLocked,
+    players: state.players.map(p => ({
+      index: p.index,
+      name: p.name,
+      color: p.color,
+      isAI: !!p.isAI,
+      shots: Array.from(p.shots.entries()),
+      ships: p.ships.map(s => ({
+        typeId: s.typeId,
+        name: s.name,
+        size: s.size,
+        shape: s.shape,
+        cells: s.cells,
+        hits: Array.from(s.hits),
+        sunk: !!s.sunk,
+        rot: s.rot || 0
+      }))
+    }))
+  };
+}
+
+function saveGame() {
+  if (state.phase === 'setup' || state.phase === 'over') return;
+  if (!state.players.length) return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serializeState()));
+  } catch (e) {
+    console.warn('saveGame failed', e);
+  }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.version !== SAVE_VERSION) return null;
+    if (!Array.isArray(data.players) || data.players.length !== 2) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function restoreGame(data) {
+  state.templateId = data.templateId;
+  state.gridKey = data.gridKey;
+  state.gridRows = data.gridRows;
+  state.gridCols = data.gridCols;
+  state.counts = data.counts || {};
+  state.gameMode = data.gameMode;
+  state.salvoMode = !!data.salvoMode;
+  state.extraShotOnHit = !!data.extraShotOnHit;
+  state.blitzMode = !!data.blitzMode;
+  state.current = data.current | 0;
+  state.placementPlayer = data.placementPlayer | 0;
+  state.elapsedBefore = data.elapsedBefore || 0;
+  state.busy = false;
+
+  state.players = data.players.map(p => ({
+    index: p.index,
+    name: p.name,
+    color: p.color,
+    isAI: !!p.isAI,
+    shots: new Map(p.shots || []),
+    ships: (p.ships || []).map(s => ({
+      ...s,
+      hits: new Set(s.hits || [])
+    }))
+  }));
+
+  // KI neu erzeugen — chooseShot() bekommt ohnehin alle Infos pro Aufruf
+  if (isCpuMode()) {
+    const difficulty = state.gameMode.replace('cpu-', '');
+    state.ai = new ComputerAI(difficulty);
+  } else {
+    state.ai = null;
+  }
+
+  // Salven-Zustand wiederherstellen
+  resetSalvoTurnState();
+  if (data.salvoShipIdx >= 0 && state.players[state.current]) {
+    const ship = state.players[state.current].ships[data.salvoShipIdx];
+    if (ship) {
+      state.salvoShip = ship;
+      state.salvoShotsLeft = data.salvoShotsLeft || 0;
+      state.salvoLocked = !!data.salvoLocked;
+    }
+  }
+
+  // Toggles / Labels aktualisieren
+  $('salvoToggle').setAttribute('aria-pressed', String(state.salvoMode));
+  $('extraShotToggle').setAttribute('aria-pressed', String(state.extraShotOnHit));
+  $('blitzToggle').setAttribute('aria-pressed', String(state.blitzMode));
+  updateBlitzDisplay();
+
+  // Bereits beendet? (z. B. letzter Schuss wurde gespeichert)
+  const p0dead = state.players[0].ships.every(s => s.sunk);
+  const p1dead = state.players[1].ships.every(s => s.sunk);
+  if (p0dead || p1dead) {
+    endGame(p0dead ? state.players[1] : state.players[0]);
+    return;
+  }
+
+  // Timer wieder anwerfen
+  state.startTime = Date.now();
+  state.timerPausedAt = null;
+  state.timerPaused = false;
+  updateTimerDisplay();
+  clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(updateTimerDisplay, 500);
+
+  if (data.phase === 'placement') {
+    state.phase = 'placement';
+    showScreen('screen-placement');
+    showPlacement();
+  } else if (data.phase === 'battle') {
+    state.phase = 'battle';
+    showScreen('screen-game');
+    renderGame();
+    showHandover();  // zeigt Übergabe-Overlay bzw. startet KI
+  } else {
+    // Unbekannte Phase → Save wegwerfen
+    clearSave();
+    updateContinueBanner();
+  }
+}
+
+function updateContinueBanner() {
+  const banner = $('continueBanner');
+  if (!banner) return;
+  const save = loadSave();
+  if (!save) {
+    banner.classList.add('hidden');
+    return;
+  }
+  banner.classList.remove('hidden');
+
+  const modeName = (PLAYER_MODES[save.gameMode] || {}).name || '—';
+  const phaseName = save.phase === 'placement' ? 'Aufstellung' : 'Schlacht';
+  const d = new Date(save.timestamp);
+  const timeStr = d.toLocaleString('de-DE', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+  });
+
+  $('continueSub').textContent =
+    `${modeName} · Feld ${save.gridRows}×${save.gridCols} · ${phaseName} · gespeichert ${timeStr}`;
 }
 
 /* ============================================================
@@ -1293,14 +1531,29 @@ function setGrid(key) {
 }
 
 function renderPlayerModeCards() {
-  $('playerModeCards').innerHTML = Object.values(PLAYER_MODES).map(m => `
-    <div class="card-select ${state.gameMode === m.id ? 'selected' : ''}"
-         data-playermode="${m.id}">
-      <i class="bi bi-check-circle-fill cs-check"></i>
-      <div class="cs-title">${m.name}</div>
-      <div class="cs-desc">${m.desc}</div>
-    </div>
-  `).join('');
+  const entries = Object.values(PLAYER_MODES);
+
+  if (state.playerModeExpanded) {
+    $('playerModeCards').innerHTML = entries.map(m => `
+      <div class="card-select ${state.gameMode === m.id ? 'selected' : ''}"
+           data-playermode="${m.id}">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">${m.name}</div>
+        <div class="cs-desc">${m.desc}</div>
+      </div>
+    `).join('');
+  } else {
+    const cur = PLAYER_MODES[state.gameMode] || entries[0];
+    $('playerModeCards').innerHTML = `
+      <div class="card-select selected" data-playermode-toggle="true" style="grid-column:1/-1">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">
+          ${cur.name}
+          <i class="bi bi-chevron-down" style="margin-left:6px;font-size:.75em;opacity:.85"></i>
+        </div>
+        <div class="cs-desc">${cur.desc}</div>
+      </div>`;
+  }
 }
 
 function renderTemplateCards() {
@@ -1524,7 +1777,6 @@ function startPlacement() {
     return;
   }
 
-  // KI-Instanz erzeugen (bzw. zurücksetzen)
   if (isCpuMode()) {
     const difficulty = state.gameMode.replace('cpu-', '');
     state.ai = new ComputerAI(difficulty);
@@ -1543,6 +1795,7 @@ function startPlacement() {
   state.phase = 'placement';
   showScreen('screen-placement');
   showPlacement();
+  saveGame();
 }
 
 function showPlacement() {
@@ -1560,12 +1813,12 @@ function rerollPlacement() {
   p.ships = ships;
   p.shots = new Map();
   showPlacement();
+  saveGame();
 }
 
 function confirmFleet() {
   if (state.placementPlayer === 0) {
     if (isCpuMode()) {
-      // Computer-Modus: P2-Aufstellung überspringen, direkt in die Schlacht
       startBattle();
     } else {
       showOverlay({
@@ -1578,6 +1831,7 @@ function confirmFleet() {
           hideOverlay();
           state.placementPlayer = 1;
           showPlacement();
+          saveGame();
         }
       });
     }
@@ -1598,6 +1852,7 @@ function startBattle() {
   showScreen('screen-game');
   startTimer();
   renderGame();
+  saveGame();
   showHandover();
 }
 
@@ -1605,7 +1860,6 @@ function renderGame() {
   const me  = state.players[state.current];
   const foe = state.players[1 - state.current];
 
-  // Bei KI-Zug bleibt die Anzeige aus Sicht des Menschen
   const humanView   = isCpuMode() && me.isAI;
   const displayOwn   = humanView ? foe : me;
   const displayEnemy = humanView ? me  : foe;
@@ -1689,6 +1943,7 @@ function selectSalvoShip(ship) {
     state.salvoShotsLeft = remaining;
   }
   renderGame();
+  saveGame();
 }
 
 /* ---- Blitz-Modus ---- */
@@ -1762,7 +2017,6 @@ function showHandover() {
 
   renderGame();
 
-  // KI-Zug automatisch starten
   if (p.isAI) {
     showToast({
       tone: p.color,
@@ -1799,15 +2053,15 @@ function showHandover() {
 function nextTurn() {
   state.current = 1 - state.current;
   resetSalvoTurnState();
+  saveGame();
   showHandover();
 }
 
-/* ---- KI-Zug (BUGFIX: foe.shots statt me.shots) ---- */
+/* ---- KI-Zug ---- */
 function startAITurn() {
   if (state.phase !== 'battle') return;
   if (!currentPlayerIsAI()) return;
 
-  // Retry statt Freeze, falls UI-Transition noch läuft
   if (state.busy) {
     setTimeout(() => startAITurn(), 150);
     return;
@@ -1818,9 +2072,8 @@ function startAITurn() {
   const ai  = state.ai;
   if (!ai) { console.warn('AI: keine ComputerAI-Instanz'); return; }
 
-  // Salven-Modus: Schiff wählen (direkte Zuweisung, robust)
   if (state.salvoMode && !state.salvoShip) {
-    state.salvoLocked = false;                    // Sicherheit gegen hängengebliebenen Lock
+    state.salvoLocked = false;
     const ship = ai.chooseSalvoShip({ ownShips: me.ships });
     if (ship) {
       const remaining = ship.cells.length - ship.hits.size;
@@ -1828,6 +2081,7 @@ function startAITurn() {
         state.salvoShip     = ship;
         state.salvoShotsLeft = remaining;
         renderGame();
+        saveGame();
       }
     }
     if (!state.salvoShip) {
@@ -1838,7 +2092,6 @@ function startAITurn() {
     }
   }
 
-  // WICHTIG: foe.shots enthält die Schüsse des AI auf den Feind (AI-Angriffe)
   const myShots = foe.shots;
 
   const sunkCells = new Set();
@@ -1871,7 +2124,6 @@ function startAITurn() {
     console.error('AI chooseShot Fehler:', e);
   }
 
-  // Fallback: wenn AI keine gültige Wahl trifft → erstes freies Feld
   const isValid = (s) =>
     s && typeof s.r === 'number' && typeof s.c === 'number'
       && !myShots.has(s.r + ',' + s.c);
@@ -1895,7 +2147,7 @@ function startAITurn() {
 
   setTimeout(() => {
     if (state.phase !== 'battle') return;
-    if (state.busy) return;                        // Schutz vor Doppel-Fire
+    if (state.busy) return;
     fire(shot.r, shot.c);
   }, 400);
 }
@@ -1956,6 +2208,7 @@ function fire(r, c) {
   }
 
   renderGame();
+  saveGame();  // ← Save nach jedem Schuss
 
   const coord = `${String.fromCharCode(65 + c)}${r + 1}`;
   const won = foe.ships.every((s) => s.sunk);
@@ -2006,7 +2259,6 @@ function fire(r, c) {
 
     const aiTurn = me.isAI === true;
 
-    // KI spielt weiter (Salve / Extra-Schuss)
     if (salvoPending || extraShotPending) {
       showToast({ tone, icon, title, sub });
       state.busy = false;
@@ -2015,7 +2267,6 @@ function fire(r, c) {
       return;
     }
 
-    // KI-Zug endet → Toast + automatischer Wechsel
     if (aiTurn) {
       showToast({ tone, icon, title, sub });
       pauseTimer();
@@ -2023,7 +2274,6 @@ function fire(r, c) {
       return;
     }
 
-    // Menschlicher Zug endet → Overlay
     pauseTimer();
     showOverlay({
       tone, icon, title, sub,
@@ -2041,6 +2291,7 @@ function endGame(winner) {
   state.busy = true;
   stopTimer();
   stopBlitz();
+  clearSave();          // ← Save aufräumen
 
   const loser = state.players[1 - winner.index];
   const shotsFired = countShots(winner);
@@ -2149,10 +2400,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', (e) => {
-    // Spielmodus
+    const pmToggle = e.target.closest('[data-playermode-toggle]');
+    if (pmToggle) {
+      state.playerModeExpanded = true;
+      renderSetup();
+      return;
+    }
     const pm = e.target.closest('[data-playermode]');
     if (pm) {
       state.gameMode = pm.dataset.playermode;
+      state.playerModeExpanded = false;
       renderSetup();
       return;
     }
@@ -2208,8 +2465,27 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btnReroll').addEventListener('click', rerollPlacement);
   $('btnConfirmFleet').addEventListener('click', confirmFleet);
 
-  $('btnRestart').addEventListener('click', () => location.reload());
-  $('btnNewGame').addEventListener('click', () => location.reload());
+  $('btnRestart').addEventListener('click', () => {
+    // "Neu" während der Schlacht → Save verwerfen
+    clearSave();
+    location.reload();
+  });
+  $('btnNewGame').addEventListener('click', () => {
+    clearSave();
+    location.reload();
+  });
+
+  // ---- Fortsetzen / Verwerfen ----
+  $('btnContinue').addEventListener('click', () => {
+    const save = loadSave();
+    if (!save) { updateContinueBanner(); return; }
+    restoreGame(save);
+    updateContinueBanner();
+  });
+  $('btnDiscardSave').addEventListener('click', () => {
+    clearSave();
+    updateContinueBanner();
+  });
 
   const syncSalvoToggle = () => {
     $('salvoToggle').setAttribute('aria-pressed', String(state.salvoMode));
@@ -2242,6 +2518,9 @@ document.addEventListener('DOMContentLoaded', () => {
   syncBlitzToggle();
 
   applyTemplate('classic');
+
+  // Save-Banner nach dem Setup-Render prüfen (nicht von applyTemplate überschreiben)
+  updateContinueBanner();
 });
 </script>
 </body>

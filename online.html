@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BATTLESHIP - Schiffe versenken</title>
+<script src="SoundLibrary.js"></script>
+<script src="ComputerAI.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#03070f; --cyan:#38e8ff; --blue:#2f9bff; --red:#ff3b5c;
+  --gold:#ffb648; --text:#cfe9ff; --muted:#6d8ba8; --line:rgba(56,232,255,.18);
+  --panel-a:rgba(12,28,48,.92); --panel-b:rgba(5,13,24,.96);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh; font-family:'Rajdhani',system-ui,sans-serif; font-weight:500;
+  color:var(--text);
+  background:
+    radial-gradient(1000px 560px at 12% -8%, rgba(29,120,200,.22), transparent 62%),
+    radial-gradient(900px 620px at 92% 108%, rgba(150,30,90,.16), transparent 62%),
+    var(--bg-0);
+  overflow-x:hidden; -webkit-font-smoothing:antialiased;
+}
+.bg-grid{
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:linear-gradient(rgba(56,232,255,.05) 1px, transparent 1px),linear-gradient(90deg, rgba(56,232,255,.05) 1px, transparent 1px);
+  background-size:52px 52px;
+  -webkit-mask-image:radial-gradient(circle at 50% 38%, #000 12%, transparent 78%);
+  mask-image:radial-gradient(circle at 50% 38%, #000 12%, transparent 78%);
+}
+.bg-grid::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);opacity:.35}
+#app{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 16px 70px}
+.hidden{display:none !important}
+.brand{
+  font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.22em;margin:0;line-height:1.05;
+  background:linear-gradient(180deg,#f2fdff 0%,#38e8ff 55%,#1866a8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px rgba(56,232,255,.35));
+}
+.brand.big{font-size:clamp(1.5rem,5vw,3rem)}
+.kicker{font-family:'Orbitron',sans-serif;font-size:.62rem;letter-spacing:.42em;color:var(--cyan);opacity:.75;text-transform:uppercase;margin-bottom:8px}
+.h2{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.1em;font-size:clamp(1rem,2.4vw,1.35rem);margin:0 0 6px;color:#eafaff}
+.muted{color:var(--muted);font-size:.92rem;margin:0 0 18px;line-height:1.5}
+.row{display:flex;flex-wrap:wrap;align-items:center}
+.row.gap{gap:12px}
+.row.center{justify-content:center}
+.pad{padding:26px 24px}
+@media(max-width:600px){.pad{padding:20px 14px}}
+.panel{
+  position:relative;
+  background:linear-gradient(160deg,var(--panel-a),var(--panel-b));
+  border:1px solid var(--line);
+  box-shadow:0 26px 70px rgba(0,0,0,.6),inset 0 1px 0 rgba(120,220,255,.10);
+  clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px);
+}
+.panel::before{content:'';position:absolute;left:0;top:0;width:44px;height:2px;background:linear-gradient(90deg,var(--cyan),transparent)}
+.panel::after{content:'';position:absolute;right:0;bottom:0;width:44px;height:2px;background:linear-gradient(270deg,var(--cyan),transparent)}
+.continue-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 18px;margin-bottom:22px;
+  background:linear-gradient(150deg,rgba(56,232,255,.14),rgba(47,155,255,.06));
+  border:1px solid rgba(56,232,255,.42);border-left:3px solid var(--cyan);
+  border-radius:3px;flex-wrap:wrap;animation:continueGlow 3s ease-in-out infinite;
+}
+@keyframes continueGlow{0%,100%{box-shadow:0 0 0 1px rgba(56,232,255,.18),0 0 18px rgba(56,232,255,.10)}50%{box-shadow:0 0 0 1px rgba(56,232,255,.5),0 0 28px rgba(56,232,255,.28)}}
+.continue-banner .cb-info{flex:1 1 auto;min-width:180px}
+.continue-banner .cb-title{font-family:'Orbitron',sans-serif;font-weight:700;font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;color:#eafaff;display:flex;align-items:center;gap:8px}
+.continue-banner .cb-title i{color:var(--cyan);font-size:1rem}
+.continue-banner .cb-sub{font-size:.82rem;color:var(--muted);margin-top:5px;letter-spacing:.02em;line-height:1.4}
+.btn{
+  font-family:'Orbitron',sans-serif;font-weight:600;font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;
+  padding:.75rem 1.25rem;border-radius:2px;cursor:pointer;
+  background:rgba(20,45,75,.55);border:1px solid rgba(56,232,255,.32);color:#cfe9ff;
+  transition:.18s ease;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  display:inline-flex;align-items:center;gap:.5rem;
+}
+.btn:hover:not(:disabled){background:rgba(38,92,145,.8);color:#fff;box-shadow:0 0 20px rgba(56,232,255,.35);transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(0)}
+.btn:disabled{opacity:.32;cursor:not-allowed}
+.btn.primary{background:linear-gradient(135deg,rgba(56,232,255,.24),rgba(47,155,255,.4));border-color:rgba(56,232,255,.75);color:#fff;box-shadow:0 0 26px rgba(56,232,255,.28)}
+.btn.ghost{background:transparent;border-color:rgba(120,180,220,.22);color:var(--muted)}
+.btn.ghost:hover{color:#fff;border-color:rgba(56,232,255,.5)}
+.btn.red{background:linear-gradient(135deg,rgba(255,59,92,.22),rgba(150,20,50,.4));border-color:rgba(255,90,120,.7)}
+.setup-head{text-align:center;margin-bottom:26px}
+.setup-head .sub{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.5em;color:var(--muted);text-transform:uppercase;margin-top:10px}
+.section-label{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.3em;color:var(--cyan);text-transform:uppercase;margin:0 0 10px;opacity:.85}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.grid-2{grid-template-columns:1fr}}
+.card-select{
+  text-align:left;cursor:pointer;padding:16px 18px;
+  background:rgba(10,24,42,.55);border:1px solid rgba(56,232,255,.18);
+  border-radius:3px;transition:.18s;position:relative;overflow:hidden;
+}
+.card-select:hover{border-color:rgba(56,232,255,.5);background:rgba(18,42,70,.7)}
+.card-select.selected{border-color:var(--cyan);background:linear-gradient(150deg,rgba(24,70,110,.85),rgba(8,22,40,.9));box-shadow:0 0 0 1px rgba(56,232,255,.45),0 0 28px rgba(56,232,255,.22)}
+.card-select .cs-title{font-family:'Orbitron',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;color:#eafaff;margin-bottom:4px}
+.card-select .cs-desc{font-size:.84rem;color:var(--muted)}
+.card-select .cs-check{position:absolute;top:10px;right:12px;color:var(--cyan);opacity:0;transition:.18s;font-size:1.05rem}
+.card-select.selected .cs-check{opacity:1}
+.player-mode-grid{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px}
+.player-mode-grid .card-select:last-child:nth-child(odd){grid-column:1 / -1}
+@media(max-width:520px){.player-mode-grid{grid-template-columns:1fr}}
+.fleet-row{
+  display:flex;align-items:center;gap:14px;padding:10px 14px;margin-bottom:8px;
+  background:rgba(9,22,38,.6);border:1px solid rgba(56,232,255,.10);
+  border-left:2px solid var(--accent,var(--cyan));border-radius:2px;
+}
+.ship-thumb{width:64px;height:26px;flex:0 0 64px;position:relative;border-radius:2px;overflow:hidden;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 60%,#0a1a2a),color-mix(in srgb,var(--accent) 12%,#05101b));box-shadow:inset 0 0 12px rgba(0,0,0,.6),0 0 12px color-mix(in srgb,var(--accent) 35%,transparent);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%)}
+.ship-thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.fleet-info{flex:1 1 auto;min-width:0}
+.fleet-name{font-family:'Orbitron',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#dff2ff}
+.fleet-meta{font-size:.78rem;color:var(--muted);letter-spacing:.04em}
+.stepper{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.stepper button{width:30px;height:30px;display:grid;place-items:center;background:rgba(20,50,85,.7);border:1px solid rgba(56,232,255,.25);color:var(--cyan);cursor:pointer;border-radius:2px;transition:.15s;font-size:.8rem}
+.stepper button:hover:not(:disabled){background:rgba(40,95,150,.9);color:#fff}
+.stepper button:disabled{opacity:.25;cursor:not-allowed}
+.stepper span{min-width:38px;text-align:center;font-family:'Orbitron',sans-serif;font-size:.85rem;color:#eafaff}
+.total-line{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px dashed rgba(56,232,255,.18);font-family:'Orbitron',sans-serif;font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.total-line b{color:var(--cyan);font-size:.82rem}
+.fleet-meter{position:relative;margin-top:14px;height:10px;background:rgba(6,16,28,.9);border:1px solid rgba(56,232,255,.18);border-radius:2px;overflow:hidden}
+.fleet-meter-fill{height:100%;width:0%;background:linear-gradient(90deg,#38e8ff,#2f9bff);box-shadow:0 0 14px rgba(56,232,255,.55);transition:width .3s ease,background .3s ease}
+.fleet-meter-fill.warn{background:linear-gradient(90deg,#ffb648,#ff3b5c);box-shadow:0 0 16px rgba(255,90,60,.6)}
+.fleet-meter-threshold{position:absolute;top:0;bottom:0;left:55%;width:2px;background:#ffb648;box-shadow:0 0 10px rgba(255,182,72,.95);z-index:2;pointer-events:none}
+.fleet-meter-legend{display:flex;justify-content:space-between;margin-top:6px;font-family:'Orbitron',sans-serif;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.fleet-meter-legend b{color:var(--cyan);font-size:.7rem}
+.fleet-meter-legend .legend-max{color:var(--gold)}
+.fleet-meter-legend .legend-max b{color:var(--gold)}
+.salvo-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;margin-top:18px;background:rgba(9,22,38,.6);border:1px solid rgba(56,232,255,.14);border-left:2px solid var(--cyan);border-radius:2px}
+.salvo-toggle + .salvo-toggle{margin-top:10px}
+.salvo-info{flex:1;min-width:0}
+.salvo-title{font-family:'Orbitron',sans-serif;font-weight:600;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:#dff2ff;margin-bottom:2px}
+.salvo-desc{font-size:.78rem;color:var(--muted);letter-spacing:.02em}
+.toggle{position:relative;width:54px;height:28px;flex:0 0 auto;background:rgba(20,45,75,.7);border:1px solid rgba(56,232,255,.25);border-radius:14px;cursor:pointer;padding:0;transition:.2s}
+.toggle-knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:.22s cubic-bezier(.4,1.2,.4,1)}
+.toggle[aria-pressed="true"]{background:rgba(56,232,255,.25);border-color:rgba(56,232,255,.75);box-shadow:0 0 18px rgba(56,232,255,.32)}
+.toggle[aria-pressed="true"] .toggle-knob{left:calc(100% - 23px);background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.cell.selectable{cursor:pointer}
+.cell.selectable:hover{z-index:2;box-shadow:inset 0 0 0 2px rgba(56,232,255,.55),inset 0 0 12px rgba(56,232,255,.3)}
+.cell.selected-ship{z-index:3;animation:selectedPulse 1.5s ease-in-out infinite}
+@keyframes selectedPulse{0%,100%{box-shadow:inset 0 0 0 2px rgba(56,232,255,.7),inset 0 0 10px rgba(56,232,255,.35)}50%{box-shadow:inset 0 0 0 2px rgba(56,232,255,1),inset 0 0 16px rgba(56,232,255,.55)}}
+.board-panel.awaiting-select{border-color:rgba(56,232,255,.5);animation:awaitSelect 1.6s ease-in-out infinite}
+@keyframes awaitSelect{0%,100%{box-shadow:0 0 14px rgba(56,232,255,.15)}50%{box-shadow:0 0 28px rgba(56,232,255,.4)}}
+.board{display:grid;gap:0px;width:100%;padding:10px;background:radial-gradient(circle at 50% 0%,rgba(20,60,100,.35),rgba(3,10,20,.9));border:1px solid rgba(56,232,255,.16);border-radius:0px;box-shadow:inset 0 0 40px rgba(0,0,0,.7)}
+.lbl{display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:.58rem;color:var(--muted);min-height:14px;user-select:none;letter-spacing:.05em}
+.cell{position:relative;aspect-ratio:1/1;background:rgba(18,44,72,.42);border:1px solid rgba(56,232,255,.07);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;user-select:none;transition:background .16s,box-shadow .16s,transform .1s}
+.cell.ship{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 58%,#0b2036),color-mix(in srgb,var(--accent) 16%,#06111c));border-color:color-mix(in srgb,var(--accent) 55%,transparent);box-shadow:inset 0 0 10px rgba(0,0,0,.55)}
+.cell:not(.ship){background-image:url(assets/tiles/water.webp);background-size:cover}
+.cell .tile-img{position:absolute;inset:0;background-size:100%;background-position:center;background-repeat:no-repeat;border-radius:inherit;pointer-events:none;transition:opacity .25s,filter .25s;will-change:transform}
+.cell.miss{background-color:rgba(6,16,28,.95);background-image:url(assets/tiles/miss.webp)}
+.cell.miss::after{content:'';position:absolute;top:50%;left:50%;width:26%;height:26%;border-radius:50%;transform:translate(-50%,-50%);background:rgba(120,190,255,.6);box-shadow:0 0 10px rgba(120,190,255,.8);z-index:2;pointer-events:none}
+.cell.hit{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 16px rgba(255,80,40,.55);color:#fff;background-image:url(assets/tiles/hit.webp)}
+.cell.hit .tile-img,.cell.sunk .tile-img{opacity:.45;filter:grayscale(.5) brightness(.75)}
+.cell.sunk{background:radial-gradient(circle at 50% 45%,#ffcf7a 0%,#b8381c 55%,#350c06 100%);animation:sinkPulse 1.6s ease-in-out infinite}
+@keyframes sinkPulse{0%,100%{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 10px rgba(255,140,60,.35)}50%{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 22px rgba(255,160,70,.75)}}
+.board.enemy .cell.aim{cursor:crosshair}
+.board.enemy .cell.aim:hover{background:rgba(255,59,92,.28);box-shadow:0 0 16px rgba(255,59,92,.6),inset 0 0 12px rgba(255,59,92,.35);transform:scale(1.04);z-index:2}
+.placement-wrap{max-width:520px;margin:0 auto 22px}
+.board-panel{background:linear-gradient(160deg,rgba(10,24,42,.75),rgba(4,11,20,.9));border:1px solid rgba(56,232,255,.14);padding:14px;border-radius:3px}
+.board-panel.p-blue{border-top:2px solid var(--blue)}
+.board-panel.p-red{border-top:2px solid var(--red)}
+.board-title{font-family:'Orbitron',sans-serif;font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.board-title i{color:var(--cyan)}
+.game-layout{display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);gap:18px;align-items:start}
+@media(max-width:860px){.game-layout{grid-template-columns:1fr}}
+.hud{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;margin-bottom:18px;flex-wrap:wrap}
+.hud-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.turn-name{font-family:'Orbitron',sans-serif;font-weight:800;font-size:.95rem;letter-spacing:.14em;text-transform:uppercase}
+.turn-name.blue{color:var(--blue);text-shadow:0 0 18px rgba(47,155,255,.6)}
+.turn-name.red{color:var(--red);text-shadow:0 0 18px rgba(255,59,92,.6)}
+.pulse{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.hud-sub{font-size:.86rem;color:var(--muted);letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:2px;background:rgba(16,38,62,.7);border:1px solid rgba(56,232,255,.16);color:#c4e2f8}
+.chip b{font-family:'Orbitron',sans-serif;font-size:.66rem;color:var(--cyan)}
+.chip .dot{width:8px;height:8px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.chip.dead{opacity:.4;text-decoration:line-through}
+.chip.dead b{color:var(--muted)}
+.status-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:10px 20px;margin-bottom:10px;background:linear-gradient(160deg,rgba(8,20,36,.97),rgba(3,9,18,.99));border:1px solid rgba(56,232,255,.16);border-bottom:2px solid var(--cyan);box-shadow:0 12px 34px rgba(0,0,0,.65),0 0 22px rgba(56,232,255,.10);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);clip-path:polygon(0 0,100% 0,100% 100%,calc(100% - 12px) 100%,0 calc(100% - 12px))}
+.status-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.status-tag{display:inline-flex;align-items:center;gap:7px;font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
+.status-tag i{color:var(--cyan);font-size:.85rem}
+.status-tag.timer{padding:4px 10px;background:rgba(56,232,255,.08);border:1px solid rgba(56,232,255,.22);border-radius:2px;color:var(--cyan)}
+.status-tag.timer b{font-family:'Orbitron',sans-serif;font-size:.82rem;font-weight:800;letter-spacing:.12em;color:#eafaff;text-shadow:0 0 12px rgba(56,232,255,.55);font-variant-numeric:tabular-nums}
+.hud-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.status-tag.timer.blitz{background:rgba(56,232,255,.08);border-color:rgba(56,232,255,.35)}
+.status-tag.timer.blitz.warn{color:var(--red);border-color:rgba(255,59,92,.55);background:rgba(255,59,92,.12);animation:blink .8s infinite}
+.status-tag.timer.blitz.warn b{color:var(--red);text-shadow:0 0 14px rgba(255,59,92,.75)}
+.panel.hud{position:sticky;top:0px;z-index:40;margin-bottom:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);background:linear-gradient(160deg,rgba(10,24,42,.96),rgba(4,11,20,.98))}
+@media(max-width:600px){.status-panel{padding:8px 12px}}
+.overlay{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(2,7,14,.86);-webkit-backdrop-filter:blur(14px) saturate(.6);backdrop-filter:blur(14px) saturate(.6);animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.overlay-card{width:min(480px,100%);padding:38px 30px;text-align:center;animation:popIn .3s cubic-bezier(.2,1.2,.4,1)}
+@keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+.ov-icon{width:74px;height:74px;margin:0 auto 18px;display:grid;place-items:center;border-radius:50%;font-size:2rem;border:1px solid rgba(56,232,255,.4);background:radial-gradient(circle,rgba(56,232,255,.18),transparent 70%);color:var(--cyan);box-shadow:0 0 34px rgba(56,232,255,.3)}
+.ov-title{font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.16em;font-size:clamp(1.1rem,4vw,1.55rem);margin:0 0 10px;color:#eafaff;text-transform:uppercase}
+.ov-sub{color:var(--muted);font-size:.95rem;margin:0 0 26px;line-height:1.55}
+.overlay.hit .ov-icon{color:#ff8a4c;border-color:rgba(255,120,60,.5);background:radial-gradient(circle,rgba(255,110,50,.22),transparent 70%);box-shadow:0 0 40px rgba(255,90,40,.45)}
+.overlay.hit .ov-title{color:#ffb08a;text-shadow:0 0 24px rgba(255,90,40,.5)}
+.overlay.miss .ov-icon{color:#6cb8ff;border-color:rgba(108,184,255,.4);background:radial-gradient(circle,rgba(70,150,230,.16),transparent 70%);box-shadow:0 0 30px rgba(70,150,230,.3)}
+.overlay.red .ov-icon{color:var(--red);border-color:rgba(255,59,92,.5);background:radial-gradient(circle,rgba(255,59,92,.2),transparent 70%);box-shadow:0 0 34px rgba(255,59,92,.4)}
+.overlay.red .ov-title{color:#ff8fa3}
+.overlay.blue .ov-icon{color:var(--blue);border-color:rgba(47,155,255,.5);background:radial-gradient(circle,rgba(47,155,255,.2),transparent 70%);box-shadow:0 0 34px rgba(47,155,255,.4)}
+.overlay.blue .ov-title{color:#8fc6ff}
+.overlay.win .ov-icon{color:var(--gold);border-color:rgba(255,182,72,.55);background:radial-gradient(circle,rgba(255,182,72,.22),transparent 70%);box-shadow:0 0 46px rgba(255,182,72,.5)}
+.overlay.win .ov-title{color:var(--gold);text-shadow:0 0 26px rgba(255,182,72,.55)}
+.end-wrap{max-width:640px;margin:0 auto;text-align:center}
+.end-emblem{width:96px;height:96px;margin:0 auto 20px;display:grid;place-items:center;font-size:2.6rem;color:var(--gold);border-radius:50%;border:1px solid rgba(255,182,72,.4);background:radial-gradient(circle,rgba(255,182,72,.16),transparent 70%);box-shadow:0 0 50px rgba(255,182,72,.35);animation:floaty 3s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.end-stats{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;margin:26px 0 30px;padding:18px 0;border-top:1px solid rgba(56,232,255,.14);border-bottom:1px solid rgba(56,232,255,.14)}
+.end-stat{text-align:center}
+.end-stat .v{font-family:'Orbitron',sans-serif;font-weight:800;font-size:1.4rem;color:var(--cyan)}
+.end-stat .k{font-size:.7rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.toast-stack{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:150;width:min(430px,calc(100% - 28px));display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{--tone:var(--cyan);position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:12px 16px 15px;background:linear-gradient(160deg,rgba(12,28,48,.97),rgba(5,13,24,.99));border:1px solid color-mix(in srgb,var(--tone) 28%,transparent);border-left:3px solid var(--tone);box-shadow:0 18px 50px rgba(0,0,0,.7),0 0 26px color-mix(in srgb,var(--tone) 22%,transparent);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);animation:toastIn .26s cubic-bezier(.2,1.2,.4,1)}
+.toast.leaving{animation:toastOut .28s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(10px) scale(.98)}}
+.toast .t-icon{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:50%;font-size:1rem;color:var(--tone);border:1px solid color-mix(in srgb,var(--tone) 45%,transparent);background:radial-gradient(circle,color-mix(in srgb,var(--tone) 22%,transparent),transparent 70%);box-shadow:0 0 18px color-mix(in srgb,var(--tone) 35%,transparent)}
+.toast .t-body{flex:1;min-width:0}
+.toast .t-title{font-family:'Orbitron',sans-serif;font-weight:700;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--tone);margin-bottom:2px}
+.toast .t-sub{font-size:.82rem;color:#a9c8e2;line-height:1.35}
+.toast .t-bar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--tone);opacity:.75;transform-origin:left;animation:toastBar var(--dur,2400ms) linear forwards}
+@keyframes toastBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.toast.hit{--tone:#ff8a4c}
+.toast.miss{--tone:#6cb8ff}
+.toast.win{--tone:var(--gold)}
+.toast.blue{--tone:var(--blue)}
+.toast.red{--tone:var(--red)}
+
+/* ===== ONLINE STYLES ===== */
+.online-panel{
+  margin-top:20px;padding:18px 20px;
+  background:linear-gradient(150deg,rgba(56,232,255,.06),rgba(47,155,255,.03));
+  border:1px solid rgba(56,232,255,.22);
+  border-left:3px solid var(--cyan);
+  border-radius:3px;
+}
+.online-panel .op-head{
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+  font-family:'Orbitron',sans-serif;font-size:.7rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--cyan);
+}
+.online-panel .op-head i{font-size:1rem}
+.online-status{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:rgba(6,16,28,.7);border:1px solid rgba(56,232,255,.15);
+  border-radius:2px;margin-bottom:14px;
+  font-family:'Orbitron',sans-serif;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+}
+.online-status .online-dot{
+  width:10px;height:10px;border-radius:50%;background:var(--muted);
+  box-shadow:0 0 8px currentColor;flex:0 0 10px;
+}
+.online-status.waiting .online-dot{background:var(--gold);box-shadow:0 0 10px var(--gold);animation:blink 1.2s infinite}
+.online-status.connected .online-dot{background:#31d98a;box-shadow:0 0 12px #31d98a}
+.online-status.error .online-dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+.online-status .os-text{color:#dff2ff}
+.online-status.waiting .os-text{color:var(--gold)}
+.online-status.connected .os-text{color:#31d98a}
+.online-status.error .os-text{color:var(--red)}
+.join-label{
+  font-family:'Orbitron',sans-serif;font-size:.58rem;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+}
+.join-link-row{display:flex;gap:8px;margin-bottom:14px}
+.join-link-row input{
+  flex:1;min-width:0;padding:9px 12px;
+  font-family:'Rajdhani',monospace;font-size:.85rem;
+  background:rgba(6,16,28,.9);color:#cfe9ff;
+  border:1px solid rgba(56,232,255,.25);border-radius:2px;
+  letter-spacing:.02em;
+}
+.join-link-row input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.15)}
+.join-link-row .btn{padding:9px 14px;font-size:.62rem}
+.qr-wrap{
+  display:flex;justify-content:center;padding:14px 0;
+  border-top:1px dashed rgba(56,232,255,.15);margin-top:12px;
+}
+.qr-wrap canvas{
+  width:160px;height:160px;image-rendering:pixelated;
+  border:1px solid rgba(56,232,255,.25);border-radius:2px;
+  background:#03070f;padding:6px;box-sizing:content-box;
+}
+.join-hint{text-align:center;font-size:.76rem;color:var(--muted);margin:10px 0 0}
+
+/* Lobby screen */
+.lobby-wrap{max-width:560px;margin:0 auto}
+.lobby-wrap .lobby-panel{margin-top:6px}
+
+/* ===== END ONLINE STYLES ===== */
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<main id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section id="screen-setup" class="screen">
+    <div class="setup-head">
+      <h1 class="brand" style="font-size:clamp(1.6rem,6vw,2.9rem)">BATTLESHIP</h1>
+      <div class="sub">Schiffe versenken</div>
+    </div>
+
+    <div class="panel pad">
+      <div id="continueBanner" class="continue-banner hidden">
+        <div class="cb-info">
+          <div class="cb-title"><i class="bi bi-clock-history"></i> Laufendes Spiel gefunden</div>
+          <div class="cb-sub" id="continueSub">—</div>
+        </div>
+        <div class="row gap">
+          <button class="btn primary" id="btnContinue"><i class="bi bi-play-fill"></i> Fortsetzen</button>
+          <button class="btn ghost" id="btnDiscardSave" title="Gespeicherten Spielstand löschen"><i class="bi bi-trash"></i> Verwerfen</button>
+        </div>
+      </div>
+
+      <div class="section-label"><i class="bi bi-people-fill"></i> Spielmodus</div>
+      <div class="player-mode-grid" id="playerModeCards"></div>
+
+      <!-- Online-Panel (nur bei 2p-online) -->
+      <div id="onlinePanel" class="online-panel hidden">
+        <div class="op-head"><i class="bi bi-wifi"></i> Online-Verbindung</div>
+        <div class="online-status waiting" id="onlineStatus">
+          <span class="online-dot"></span>
+          <span class="os-text" id="onlineStatusText">Erstelle Verbindung …</span>
+        </div>
+        <div id="joinInfo" class="hidden">
+          <div class="join-label">Beitritts-Link</div>
+          <div class="join-link-row">
+            <input type="text" id="joinLinkInput" readonly placeholder="Wird erzeugt …">
+            <button class="btn" id="btnCopyLink" title="Link kopieren">
+              <i class="bi bi-clipboard"></i> Kopieren
+            </button>
+          </div>
+          <div class="qr-wrap"><canvas id="qrCanvas" width="160" height="160"></canvas></div>
+          <p class="join-hint">Sende diesen Link an deinen Gegner.</p>
+        </div>
+      </div>
+
+      <!-- Standard-Setup (für Nicht-Online) -->
+      <div id="standardSetup">
+        <div style="height:26px"></div>
+        <div class="section-label"><i class="bi bi-collection"></i> Vorlage</div>
+        <div class="grid-2" id="templateCards"></div>
+
+        <div style="height:26px"></div>
+        <div class="section-label"><i class="bi bi-grid-3x3"></i> Spielfeldgröße</div>
+        <div class="row gap" id="gridBtns" style="margin-bottom:26px"></div>
+
+        <div class="section-label"><i class="bi bi-diagram-3"></i> Flotte</div>
+        <div id="fleetConfig"></div>
+        <div class="total-line">
+          <span>Gesamt</span>
+          <span><b id="totalShips">0</b> Schiffe · <b id="totalCells">0</b> Felder</span>
+        </div>
+        <div class="fleet-meter" aria-hidden="true">
+          <div class="fleet-meter-fill" id="fleetMeterFill"></div>
+          <div class="fleet-meter-threshold"></div>
+        </div>
+        <div class="fleet-meter-legend">
+          <span>Belegung <b id="fleetPct">0%</b></span>
+          <span class="legend-max">Maximum <b>55%</b></span>
+        </div>
+
+        <div class="salvo-toggle">
+          <div class="salvo-info">
+            <div class="salvo-title">Salven-Modus</div>
+            <div class="salvo-desc">Schiff wählen · Schüsse = verbleibende Felder</div>
+          </div>
+          <button class="toggle" id="salvoToggle" aria-pressed="false" aria-label="Salven-Modus umschalten"><span class="toggle-knob"></span></button>
+        </div>
+        <div class="salvo-toggle">
+          <div class="salvo-info">
+            <div class="salvo-title">Treffer = Extra Schuss</div>
+            <div class="salvo-desc">Bei jedem Treffer bleibt man am Zug (außer Seeminen)</div>
+          </div>
+          <button class="toggle" id="extraShotToggle" aria-pressed="false" aria-label="Extra-Schuss bei Treffer umschalten"><span class="toggle-knob"></span></button>
+        </div>
+        <div class="salvo-toggle">
+          <div class="salvo-info">
+            <div class="salvo-title">Blitz Modus</div>
+            <div class="salvo-desc">15 Sekunden pro Zug · Zeit abgelaufen = Spielerwechsel</div>
+          </div>
+          <button class="toggle" id="blitzToggle" aria-pressed="false" aria-label="Blitz-Modus umschalten"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <div class="row gap center" style="margin-top:26px">
+        <button class="btn primary" id="btnStartMatch">
+          <i class="bi bi-radar"></i> Flotten bereitmachen
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ONLINE LOBBY (Resume) ============ -->
+  <section id="screen-online-lobby" class="screen hidden">
+    <div class="lobby-wrap">
+      <div class="panel pad">
+        <div class="kicker">Online-Spiel fortsetzen</div>
+        <h2 class="h2">Warte auf Gegner</h2>
+        <p class="muted">Dein Gegner muss dem Spiel erneut beitreten. Sende ihm dazu diesen Link.</p>
+        <div class="online-panel lobby-panel">
+          <div class="op-head"><i class="bi bi-wifi"></i> Online-Verbindung</div>
+          <div class="online-status waiting" id="lobbyOnlineStatus">
+            <span class="online-dot"></span>
+            <span class="os-text" id="lobbyStatusText">Erstelle Verbindung …</span>
+          </div>
+          <div id="lobbyJoinInfo" class="hidden">
+            <div class="join-label">Beitritts-Link</div>
+            <div class="join-link-row">
+              <input type="text" id="lobbyLinkInput" readonly>
+              <button class="btn" id="lobbyCopyLink"><i class="bi bi-clipboard"></i> Kopieren</button>
+            </div>
+            <div class="qr-wrap"><canvas id="lobbyQrCanvas" width="160" height="160"></canvas></div>
+            <p class="join-hint">Sende diesen Link an deinen Gegner.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLACEMENT ============ -->
+  <section id="screen-placement" class="screen hidden">
+    <div class="panel pad">
+      <div class="kicker">Phase 01 · Aufstellung</div>
+      <h2 class="h2" id="placementTitle">Flottenaufstellung</h2>
+      <p class="muted">Deine Flotte wurde zufällig positioniert. Präge dir die Positionen ein — dieses Feld siehst nur du.</p>
+      <div class="placement-wrap"><div id="placementBoard" class="board"></div></div>
+      <div class="row gap center">
+        <button class="btn" id="btnReroll"><i class="bi bi-shuffle"></i> Neu platzieren</button>
+        <button class="btn primary" id="btnConfirmFleet"><i class="bi bi-shield-check"></i> Flotte bestätigen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="screen-game" class="screen hidden">
+    <div class="status-panel">
+      <div class="status-left">
+        <span class="status-tag"><i class="bi bi-broadcast-pin"></i> Status</span>
+        <span class="status-tag timer" id="statusTimer" title="Verstrichene Spielzeit">
+          <i class="bi bi-stopwatch"></i><b id="timerValue">00:00</b>
+        </span>
+      </div>
+      <div class="row gap">
+        <button class="btn ghost" id="btnRestart"><i class="bi bi-arrow-counterclockwise"></i> Neu</button>
+      </div>
+    </div>
+
+    <div class="panel hud">
+      <div class="hud-left">
+        <span class="pulse"></span>
+        <span class="turn-name blue" id="turnName">Spieler 1</span>
+        <span class="hud-sub" id="hudSub">ist am Zug · Ziel erfassen</span>
+      </div>
+      <div class="hud-right">
+        <span class="status-tag timer blitz" id="blitzTimer" style="display:none;" title="Restzeit im Zug">
+          <i class="bi bi-hourglass-split"></i><b id="blitzValue">15</b><span>s</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="game-layout">
+      <div>
+        <div class="board-panel" id="ownPanel">
+          <div class="board-title"><i class="bi bi-shield-shaded"></i> Eigene Flotte</div>
+          <div id="ownBoard" class="board"></div>
+        </div>
+      </div>
+      <div>
+        <div class="board-panel" id="enemyPanel">
+          <div class="board-title"><i class="bi bi-crosshair"></i> Feindgewässer · Zielerfassung</div>
+          <div id="enemyBoard" class="board enemy"></div>
+          <div class="chips" id="enemyFleet"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ END ============ -->
+  <section id="screen-end" class="screen hidden">
+    <div class="panel pad end-wrap">
+      <div class="end-emblem"><i class="bi bi-trophy-fill"></i></div>
+      <div class="kicker">Mission beendet</div>
+      <h1 class="brand big" id="endTitle">SPIELER 1 SIEGT</h1>
+      <p class="muted" id="endSub" style="margin-top:14px"></p>
+      <div class="end-stats" id="endStats"></div>
+      <div class="row gap center">
+        <button class="btn primary" id="btnNewGame"><i class="bi bi-arrow-repeat"></i> Neue Partie</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
+<div id="overlay" class="overlay hidden">
+  <div class="overlay-card panel">
+    <div class="ov-icon"><i class="bi bi-radar" id="ovIcon"></i></div>
+    <h2 class="ov-title" id="ovTitle">Titel</h2>
+    <p class="ov-sub" id="ovSub">Text</p>
+    <button class="btn primary" id="ovBtn">Weiter</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ONLINE (PeerJS)
+   ============================================================ */
+const ONLINE_SAVE_KEY = 'battleshipOnlineGame';
+const ONLINE_SAVE_VERSION = 1;
+const BLITZ_SECONDS = 15;
+
+let online = {
+  role: null,       // 'host' | 'guest'
+  peer: null,
+  conn: null,
+  peerId: null,
+  hostPeerId: null,
+  connected: false,
+  joinLink: null,
+  myFleetReady: false,
+  remoteFleetReady: false,
+  resumeMode: false,
+  pendingSnapshot: null
+};
+
+function isOnlineMode() { return state.gameMode === '2p-online'; }
+function isOnlineHost() { return isOnlineMode() && online.role === 'host'; }
+function isOnlineGuest() { return isOnlineMode() && online.role === 'guest'; }
+
+/* --- Peer-ID / Link --- */
+function generatePeerId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = 'bs-';
+  for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+function buildJoinLink(peerId) {
+  return `${location.origin}${location.pathname}?join=${encodeURIComponent(peerId)}`;
+}
+
+/* --- Peer erstellen / verbinden --- */
+function initOnlineHost() {
+  destroyPeer();
+  online.role = 'host';
+  online.connected = false;
+  online.myFleetReady = false;
+  online.remoteFleetReady = false;
+  online.joinLink = null;
+
+  const id = generatePeerId();
+  try {
+    online.peer = new Peer(id);
+  } catch (e) {
+    console.warn('Peer init failed', e);
+    setOnlineStatus('error', 'PeerJS nicht verfügbar');
+    return;
+  }
+
+  online.peer.on('open', (pid) => {
+    online.peerId = pid;
+    online.joinLink = buildJoinLink(pid);
+    updateOnlineUI();
+    setOnlineStatus('waiting', 'Warte auf Spieler …');
+  });
+
+  online.peer.on('connection', (conn) => {
+    if (online.conn && online.conn.open) {
+      try { conn.close(); } catch (e) {}
+      return;
+    }
+    online.conn = conn;
+    setupConnection(conn, 'host');
+  });
+
+  online.peer.on('error', (err) => {
+    console.warn('Peer error:', err);
+    if (err.type === 'unavailable-id') {
+      // Retry with new ID
+      setTimeout(initOnlineHost, 300);
+      return;
+    }
+    setOnlineStatus('error', 'Verbindungsfehler');
+  });
+}
+
+function initOnlineGuest(hostPeerId) {
+  destroyPeer();
+  online.role = 'guest';
+  online.hostPeerId = hostPeerId;
+  online.connected = false;
+  online.myFleetReady = false;
+  online.remoteFleetReady = false;
+
+  setOnlineStatus('waiting', 'Verbinde mit Host …');
+
+  try {
+    online.peer = new Peer();
+  } catch (e) {
+    setOnlineStatus('error', 'PeerJS nicht verfügbar');
+    return;
+  }
+
+  online.peer.on('open', () => {
+    const conn = online.peer.connect(hostPeerId, { reliable: true });
+    online.conn = conn;
+    setupConnection(conn, 'guest');
+  });
+
+  online.peer.on('error', (err) => {
+    console.warn('Peer error:', err);
+    setOnlineStatus('error', 'Verbindung fehlgeschlagen');
+    onRemoteDisconnect(true);
+  });
+}
+
+function setupConnection(conn, role) {
+  conn.on('open', () => {
+    online.connected = true;
+    setOnlineStatus('connected', 'Spieler verbunden');
+    updateStartButtonState();
+    showToast({ tone: 'win', icon: 'bi-check-circle-fill', title: 'Verbunden', sub: 'Gegner ist beigetreten.' });
+
+    if (role === 'host') {
+      sendGameConfig();
+      // Wenn Resume-Modus: Snapshot senden, sobald Gast bereit ist
+      if (online.resumeMode) {
+        online.pendingSnapshot = loadOnlineSave();
+      }
+    }
+  });
+
+  conn.on('data', (msg) => {
+    if (!msg || !msg.type) return;
+    handleOnlineMessage(msg);
+  });
+
+  conn.on('close', () => {
+    if (!online.connected) return;
+    online.connected = false;
+    onRemoteDisconnect();
+  });
+
+  conn.on('error', (err) => {
+    console.warn('Conn error', err);
+    if (!online.connected) return;
+    online.connected = false;
+    onRemoteDisconnect();
+  });
+}
+
+function destroyPeer() {
+  if (online.conn) {
+    try { online.conn.close(); } catch (e) {}
+    online.conn = null;
+  }
+  if (online.peer) {
+    try { online.peer.destroy(); } catch (e) {}
+    online.peer = null;
+  }
+  online.connected = false;
+}
+
+/* --- Senden --- */
+function sendOnline(msg) {
+  if (!online.conn || !online.conn.open) return;
+  try { online.conn.send(msg); } catch (e) { console.warn('send failed', e); }
+}
+
+/* --- Nachrichten-Dispatcher --- */
+function handleOnlineMessage(msg) {
+  switch (msg.type) {
+    case 'game_config':
+      applyGameConfig(msg);
+      break;
+    case 'start_placement':
+      if (isOnlineGuest()) {
+        startPlacement();
+      }
+      break;
+    case 'fleet_data':
+      handleRemoteFleet(msg);
+      break;
+    case 'battle_start':
+      if (isOnlineGuest()) {
+        state.phase = 'battle';
+        state.busy = false;
+        resetSalvoTurnState();
+        showScreen('screen-game');
+        startTimer();
+        renderGame();
+        // Gast beginnt nicht — Host ist Player 0, startet
+        if (state.current === 1) {
+          state.busy = false;
+          startBlitz();
+        }
+        saveGame();
+      }
+      break;
+    case 'shot':
+      if (isOnlineHost()) handleIncomingShot(msg);
+      break;
+    case 'shot_result':
+      if (isOnlineGuest()) handleShotResult(msg);
+      break;
+    case 'turn_change':
+      if (isOnlineGuest()) handleTurnChange(msg);
+      break;
+    case 'game_over':
+      if (isOnlineGuest()) handleRemoteGameOver(msg);
+      break;
+    case 'blitz_timeout':
+      if (isOnlineHost()) handleRemoteBlitzTimeout();
+      break;
+    case 'state_snapshot':
+      if (isOnlineGuest()) handleStateSnapshot(msg);
+      break;
+    case 'request_snapshot':
+      if (isOnlineHost() && online.pendingSnapshot) {
+        sendOnline({ type: 'state_snapshot', data: online.pendingSnapshot });
+      }
+      break;
+  }
+}
+
+/* --- GameConfig --- */
+function sendGameConfig() {
+  sendOnline({
+    type: 'game_config',
+    templateId: state.templateId,
+    gridKey: state.gridKey,
+    gridRows: state.gridRows,
+    gridCols: state.gridCols,
+    counts: state.counts,
+    salvoMode: state.salvoMode,
+    extraShotOnHit: state.extraShotOnHit,
+    blitzMode: state.blitzMode
+  });
+}
+
+function applyGameConfig(msg) {
+  state.templateId = msg.templateId || 'custom';
+  state.gridKey = msg.gridKey;
+  state.gridRows = msg.gridRows;
+  state.gridCols = msg.gridCols;
+  state.counts = msg.counts || {};
+  state.salvoMode = !!msg.salvoMode;
+  state.extraShotOnHit = !!msg.extraShotOnHit;
+  state.blitzMode = !!msg.blitzMode;
+  updateToggleUI();
+  renderSetup();
+}
+
+/* --- Fleet Data --- */
+function sendFleetData() {
+  const myIdx = online.role === 'host' ? 0 : 1;
+  const myShips = state.players[myIdx].ships.map(s => ({
+    typeId: s.typeId, name: s.name, size: s.size, shape: s.shape,
+    cells: s.cells.map(c => ({ r: c.r, c: c.c, tile: c.tile })),
+    hits: [], sunk: false, rot: s.rot || 0
+  }));
+  sendOnline({ type: 'fleet_data', ships: myShips });
+  online.myFleetReady = true;
+  checkBothFleetsReady();
+}
+
+function handleRemoteFleet(msg) {
+  const remoteIdx = online.role === 'host' ? 1 : 0;
+  state.players[remoteIdx].ships = (msg.ships || []).map(s => ({
+    ...s,
+    hits: new Set(),
+    sunk: false
+  }));
+  online.remoteFleetReady = true;
+  checkBothFleetsReady();
+}
+
+function checkBothFleetsReady() {
+  if (!online.myFleetReady || !online.remoteFleetReady) return;
+
+  if (isOnlineHost()) {
+    sendOnline({ type: 'battle_start' });
+    startBattleOnlineHost();
+  }
+  // Gast wartet auf battle_start
+}
+
+function startBattleOnlineHost() {
+  state.phase = 'battle';
+  state.current = 0; // Host beginnt
+  state.busy = false;
+  resetSalvoTurnState();
+  showScreen('screen-game');
+  startTimer();
+  renderGame();
+  saveGame();
+  state.busy = true;
+  // Host beginnt
+  state.busy = false;
+  startBlitz();
+}
+
+/* --- Shot (Host → Guest: result; Guest → Host: request) --- */
+function handleIncomingShot(msg) {
+  if (state.phase !== 'battle') return;
+  if (state.current !== 1) return; // Guest only shoots on their turn
+
+  // Guest feuert — Host verarbeitet als wäre er lokal am Zug
+  const wasCurrent = state.current;
+  // Temporär current auf 1 (Gast) — ist bereits so
+  processShot(1, msg.r, msg.c);
+}
+
+function handleShotResult(msg) {
+  if (state.phase !== 'battle') return;
+
+  const isMyShot = msg.shooter === 'guest';
+  const targetIdx = isMyShot ? 0 : 1; // Gegner von Gast ist Host (0)
+  const target = state.players[targetIdx];
+  const k = ck(msg.r, msg.c);
+
+  target.shots.set(k, { result: msg.result, sunk: !!msg.sunk });
+
+  // Sunk markieren
+  if (msg.sunk) {
+    const ship = target.ships.find(s => s.typeId === msg.sunk.typeId && !s.sunk);
+    if (ship) {
+      ship.sunk = true;
+      for (const sc of ship.cells) ship.hits.add(ck(sc.r, sc.c));
+    }
+  }
+
+  // Salvo-State
+  if (state.salvoMode) {
+    state.salvoShotsLeft = msg.salvoShotsLeft || 0;
+    if (msg.salvoShotsLeft > 0) state.salvoLocked = true;
+  }
+
+  renderGame();
+
+  const coord = `${String.fromCharCode(65 + msg.c)}${msg.r + 1}`;
+  let title, sub, tone, icon;
+  if (msg.sunk) { title = 'Versenkt'; sub = `${msg.sunk.name} auf ${coord} zerstört!`; tone = 'hit'; icon = 'bi-radioactive'; }
+  else if (msg.result === 'hit') { title = 'Treffer'; sub = `Position ${coord} — Schiff getroffen.`; tone = 'hit'; icon = 'bi-fire'; }
+  else { title = 'Wasser'; sub = `Position ${coord} — kein Treffer.`; tone = 'miss'; icon = 'bi-water'; }
+
+  if (msg.won) {
+    showToast({ tone: 'win', icon: 'bi-trophy-fill', title: 'Sieg', sub: 'Feindflotte vernichtet!' });
+    return;
+  }
+
+  showToast({ tone, icon, title, sub });
+
+  // Turn end (Host sendet turn_change separat)
+  state.busy = false;
+  renderGame();
+}
+
+function processShot(shooterIdx, r, c) {
+  // Wird vom Host aufgerufen
+  const me  = state.players[state.current];
+  const foe = state.players[1 - state.current];
+  const k = ck(r, c);
+  if (foe.shots.has(k)) return;
+
+  if (state.salvoMode) {
+    if (!state.salvoShip) return;
+    if (state.salvoShotsLeft <= 0) return;
+  }
+
+  state.busy = true;
+
+  const ship = foe.ships.find((s) => s.cells.some((sc) => sc.r === r && sc.c === c));
+  let res;
+  let sunkNow = null;
+  let mineSunkShip = null;
+
+  if (ship) {
+    ship.hits.add(k);
+    if (ship.hits.size >= ship.cells.length) { ship.sunk = true; sunkNow = ship; }
+    res = { result: 'hit', sunk: !!sunkNow };
+    if (ship.typeId === 'mine' && state.salvoMode && state.salvoShip && !state.salvoShip.sunk) {
+      const victim = state.salvoShip;
+      victim.cells.forEach((sc) => victim.hits.add(ck(sc.r, sc.c)));
+      victim.sunk = true;
+      mineSunkShip = victim;
+    }
+  } else {
+    res = { result: 'miss', sunk: false };
+  }
+  foe.shots.set(k, res);
+
+  const isHitOnShip = res.result === 'hit' && ship && ship.typeId !== 'mine';
+  const extraShotGranted = state.extraShotOnHit && isHitOnShip && !mineSunkShip;
+
+  if (state.salvoMode) {
+    if (mineSunkShip) state.salvoShotsLeft = 0;
+    else if (!extraShotGranted) state.salvoShotsLeft--;
+    state.salvoLocked = true;
+  }
+
+  renderGame();
+  saveGame();
+
+  const coord = `${String.fromCharCode(65 + c)}${r + 1}`;
+  const won = foe.ships.every((s) => s.sunk);
+  const salvoPending = state.salvoMode && !won && state.salvoShotsLeft > 0 && !mineSunkShip;
+  const extraShotPending = !state.salvoMode && extraShotGranted && !won;
+  const turnEnds = !won && !salvoPending && !extraShotPending;
+
+  // Send to guest
+  if (isOnlineHost()) {
+    sendOnline({
+      type: 'shot_result',
+      shooter: state.current === 0 ? 'host' : 'guest',
+      r, c,
+      result: res.result,
+      sunk: sunkNow ? { typeId: sunkNow.typeId, name: sunkNow.name } : null,
+      mineSunk: mineSunkShip ? { name: mineSunkShip.name } : null,
+      extraShot: extraShotGranted,
+      salvoShotsLeft: state.salvoMode ? state.salvoShotsLeft : null,
+      won,
+      turnEnds
+    });
+  }
+
+  if (won) {
+    pauseTimer();
+    showOverlay({
+      tone: 'win', icon: 'bi-trophy-fill', title: 'Flotte vernichtet',
+      sub: `${me.name} hat alle Schiffe von ${foe.name} versenkt.`,
+      btn: 'Zur Auswertung',
+      onBtn: () => { hideOverlay(); endGame(me); }
+    });
+    if (isOnlineHost()) {
+      sendOnline({ type: 'game_over', winner: state.current });
+    }
+    return;
+  }
+
+  // Toast
+  let title, sub, tone, icon;
+  if (mineSunkShip) {
+    title = 'Seemine!'; tone = 'hit'; icon = 'bi-exclamation-triangle-fill';
+    sub = `${coord} — Seemine detoniert! ${mineSunkShip.name} wurde versenkt.`;
+  } else if (sunkNow) {
+    title = 'Versenkt'; tone = 'hit'; icon = 'bi-radioactive';
+    sub = `${sunkNow.name} auf ${coord} zerstört!`;
+  } else if (res.result === 'hit') {
+    title = 'Treffer'; tone = 'hit'; icon = 'bi-fire';
+    sub = `Position ${coord} — feindliches Schiff getroffen.`;
+  } else {
+    title = 'Wasser'; tone = 'miss'; icon = 'bi-water';
+    sub = `Position ${coord} — kein Treffer.`;
+  }
+
+  if (state.salvoMode && salvoPending) {
+    const word = state.salvoShotsLeft === 1 ? 'Schuss' : 'Schüsse';
+    sub += ` · Noch ${state.salvoShotsLeft} ${word}.`;
+  } else if (extraShotPending) {
+    sub += ' · Extra-Schuss!';
+  }
+
+  showToast({ tone, icon, title, sub });
+
+  setTimeout(() => {
+    state.busy = false;
+    if (turnEnds) {
+      nextTurn();
+    } else {
+      renderGame();
+    }
+  }, 300);
+}
+
+/* --- Turn Change (Host → Guest) --- */
+function handleTurnChange(msg) {
+  // Gast wendet Zugwechsel an
+  if (state.phase !== 'battle') return;
+  state.current = msg.current;
+  resetSalvoTurnState();
+  renderGame();
+  saveGame();
+
+  if (msg.current === 1) {
+    // Gast ist am Zug
+    state.busy = false;
+    startBlitz();
+    showToast({ tone: 'blue', icon: 'bi-crosshair', title: 'Dein Zug', sub: 'Ziel erfassen.' });
+  } else {
+    // Host ist am Zug
+    state.busy = true;
+    stopBlitz();
+    showToast({ tone: 'red', icon: 'bi-hourglass', title: 'Gegner am Zug', sub: 'Warte auf Schuss …' });
+  }
+}
+
+/* --- Game Over (Host → Guest) --- */
+function handleRemoteGameOver(msg) {
+  const winner = state.players[msg.winner];
+  endGame(winner, true);
+}
+
+/* --- Blitz Timeout (Guest → Host) --- */
+function handleRemoteBlitzTimeout() {
+  if (!isOnlineHost()) return;
+  if (state.phase !== 'battle') return;
+  if (state.busy) return;
+  // Turn wechseln
+  pauseTimer();
+  showOverlay({
+    tone: 'red', icon: 'bi-hourglass-bottom', title: 'Zeit abgelaufen',
+    sub: 'Der Gegner hat die Zugzeit überschritten.',
+    btn: 'Weiter',
+    onBtn: () => { hideOverlay(); resumeTimer(); nextTurn(); }
+  });
+}
+
+/* --- State Snapshot (Resume) --- */
+function handleStateSnapshot(msg) {
+  if (!online.resumeMode && state.phase !== 'setup') return;
+  restoreGame(msg.data);
+  online.resumeMode = false;
+  online.pendingSnapshot = null;
+}
+
+/* --- Disconnect --- */
+function onRemoteDisconnect(isError) {
+  if (state.phase === 'over') return;
+  if (!isOnlineMode()) return;
+
+  stopBlitz();
+  pauseTimer();
+
+  const isInGame = state.phase === 'placement' || state.phase === 'battle';
+
+  if (!isInGame && state.phase === 'setup') {
+    // Nur Lobby: zurück zu Setup
+    setOnlineStatus('error', 'Verbindung getrennt');
+    showToast({ tone: 'red', icon: 'bi-wifi-off', title: 'Verbindung getrennt', sub: 'Der Gegner hat das Spiel verlassen.' });
+    return;
+  }
+
+  state.busy = true;
+  showOverlay({
+    tone: 'red', icon: 'bi-wifi-off', title: 'Verbindung getrennt',
+    sub: isError ? 'Die Verbindung zum Gegner wurde unterbrochen.' : 'Der Gegner hat das Spiel verlassen.',
+    btn: 'Zum Hauptbildschirm',
+    onBtn: () => {
+      hideOverlay();
+      destroyPeer();
+      resetToMainMenu();
+    }
+  });
+}
+
+function resetToMainMenu() {
+  stopTimer();
+  stopBlitz();
+  state.phase = 'setup';
+  state.players = [];
+  state.busy = false;
+  state.gameMode = '2p';
+  online.role = null;
+  online.connected = false;
+  online.resumeMode = false;
+  showScreen('screen-setup');
+  renderSetup();
+  updateContinueBanner();
+}
+
+/* --- Online Save (Host only) --- */
+function saveOnlineGame() {
+  if (!isOnlineHost()) return;
+  if (state.phase !== 'placement' && state.phase !== 'battle') return;
+  try {
+    const data = serializeState();
+    data.online = true;
+    data.version = ONLINE_SAVE_VERSION;
+    localStorage.setItem(ONLINE_SAVE_KEY, JSON.stringify(data));
+  } catch (e) { console.warn('save online failed', e); }
+}
+
+function loadOnlineSave() {
+  try {
+    const raw = localStorage.getItem(ONLINE_SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !data.online) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+function clearOnlineSave() {
+  try { localStorage.removeItem(ONLINE_SAVE_KEY); } catch (e) {}
+}
+
+/* --- UI Updates --- */
+function setOnlineStatus(kind, text) {
+  const statuses = [
+    { wrap: 'onlineStatus', text: 'onlineStatusText' },
+    { wrap: 'lobbyOnlineStatus', text: 'lobbyStatusText' }
+  ];
+  statuses.forEach(({ wrap, text }) => {
+    const w = $(wrap);
+    const t = $(text);
+    if (w) { w.className = 'online-status ' + kind; }
+    if (t) { t.textContent = text; }
+  });
+}
+
+function updateOnlineUI() {
+  // Join-Info anzeigen
+  const joinInfo = $('joinInfo');
+  const lobbyJoinInfo = $('lobbyJoinInfo');
+  if (online.joinLink) {
+    if (joinInfo) joinInfo.classList.remove('hidden');
+    if (lobbyJoinInfo) lobbyJoinInfo.classList.remove('hidden');
+    const li = $('joinLinkInput');
+    const lli = $('lobbyLinkInput');
+    if (li) li.value = online.joinLink;
+    if (lli) lli.value = online.joinLink;
+    renderQR('qrCanvas', online.joinLink);
+    renderQR('lobbyQrCanvas', online.joinLink);
+  }
+}
+
+function renderQR(canvasId, text) {
+  const canvas = $(canvasId);
+  if (!canvas || typeof QRCode === 'undefined') return;
+  try {
+    QRCode.toCanvas(canvas, text, {
+      width: 160, margin: 1,
+      color: { dark: '#38e8ff', light: '#03070f' }
+    }, (err) => { if (err) console.warn('QR error', err); });
+  } catch (e) { console.warn('QR exception', e); }
+}
+
+function updateStartButtonState() {
+  const btn = $('btnStartMatch');
+  if (!btn) return;
+  if (isOnlineMode()) {
+    btn.disabled = !online.connected;
+  } else {
+    btn.disabled = false;
+  }
+}
+
+function updateToggleUI() {
+  $('salvoToggle')?.setAttribute('aria-pressed', String(state.salvoMode));
+  $('extraShotToggle')?.setAttribute('aria-pressed', String(state.extraShotOnHit));
+  $('blitzToggle')?.setAttribute('aria-pressed', String(state.blitzMode));
+  updateBlitzDisplay();
+}
+
+/* ============================================================
+   HAUPTPROGRAMM
+   ============================================================ */
+const sfx = new SoundLibrary({ volume: 0.5 });
+
+const ASSET_ROOT = 'assets/ships/';
+const shipSet = (id, size) => ({
+  asset: `${ASSET_ROOT}${id}.webp`,
+  tiles: Array.from({ length: size }, (_, i) => `${ASSET_ROOT}${id}${i + 1}.webp`)
+});
+
+const ASSETS = {
+  ships: {
+    carrier: shipSet('carrier', 5),
+    battleship: shipSet('battleship', 4),
+    cruiser: shipSet('cruiser', 3),
+    submarine: shipSet('submarine', 3),
+    destroyer: shipSet('destroyer', 2),
+    boat: shipSet('boat', 1),
+    mine: shipSet('mine', 1)
+  },
+  ui: { logo: 'assets/ui/logo.webp', emblem: 'assets/ui/emblem.webp' }
+};
+
+const SHIP_TYPES = {
+  carrier: { id: 'carrier', name: 'Flugzeugträger', size: 5, shape: 'line', ...ASSETS.ships.carrier, accent: '#38e8ff', icon: 'bi-broadcast' },
+  battleship: { id: 'battleship', name: 'Schlachtschiff', size: 4, shape: 'line', ...ASSETS.ships.battleship, accent: '#2f9bff', icon: 'bi-shield-shaded' },
+  cruiser: { id: 'cruiser', name: 'Kreuzer', size: 3, shape: 'line', ...ASSETS.ships.cruiser, accent: '#8b7bff', icon: 'bi-compass' },
+  submarine: { id: 'submarine', name: 'U-Boot', size: 3, shape: 'line', ...ASSETS.ships.submarine, accent: '#31d98a', icon: 'bi-water' },
+  destroyer: { id: 'destroyer', name: 'Zerstörer', size: 2, shape: 'line', ...ASSETS.ships.destroyer, accent: '#ffb648', icon: 'bi-lightning-charge' },
+  boat: { id: 'boat', name: 'Boot', size: 1, shape: 'line', ...ASSETS.ships.boat, accent: '#4dd0e1', icon: 'bi-life-preserver' },
+  mine: { id: 'mine', name: 'Seemine', size: 1, shape: 'line', require: 'salvoMode', ...ASSETS.ships.mine, accent: '#ff4757', icon: 'bi-exclamation-triangle-fill' }
+};
+
+const GRID_TYPES = {
+  "05": [5, 5], "07": [7, 7], "08": [8, 8], "08b": [10, 8], "08c": [12, 8],
+  "10": [10, 10], "12": [12, 12], "15": [15, 15]
+};
+
+const MAX_OCCUPANCY = 0.55;
+
+const PLAYER_MODES = {
+  '2p': { id: '2p', name: '2 Spieler', desc: 'Lokaler Mehrspieler · Hot-Seat' },
+  '2p-online': { id: '2p-online', name: '2 Spieler Online', desc: 'Online-Mehrspieler · PeerJS' },
+  'cpu-easy': { id: 'cpu-easy', name: 'Computer (Leicht)', desc: 'Zufällige Schüsse' },
+  'cpu-medium': { id: 'cpu-medium', name: 'Computer (Mittel)', desc: 'Verfolgt Treffer · einfache Logik' },
+  'cpu-hard': { id: 'cpu-hard', name: 'Computer (Schwer)', desc: 'Muster-Suche · Linien-Verfolgung' },
+  'cpu-expert': { id: 'cpu-expert', name: 'Computer (Experte)', desc: 'Wahrscheinlichkeits-Analyse' }
+};
+
+function isCpuMode() { return state.gameMode && state.gameMode.startsWith('cpu-'); }
+function currentPlayerIsAI() { return isCpuMode() && state.players[state.current] && state.players[state.current].isAI === true; }
+
+const TEMPLATES = {
+  classic: { id: 'classic', name: 'Klassisch', gridKey: '08', desc: 'Standardflotte · 5 Schiffstypen · 17 Felder', fleet: { carrier: 1, battleship: 1, cruiser: 1, submarine: 1, destroyer: 1 } },
+  russian: { id: 'russian', name: 'Russisch', gridKey: '10', desc: 'Russische Flotte · 4 Schiffstypen · 20 Felder', fleet: { battleship: 1, cruiser: 2, destroyer: 3, boat: 4 } },
+  custom: { id: 'custom', name: 'Benutzerdefiniert', gridKey: '10', desc: 'Eigene Zusammenstellung · frei konfigurierbar', fleet: { carrier: 1, battleship: 1, cruiser: 1, submarine: 1, destroyer: 1, boat: 1 } }
+};
+
+const state = {
+  templateId: 'classic', gridKey: '10', gridRows: 10, gridCols: 10,
+  gridExpanded: false, templateExpanded: false, playerModeExpanded: false,
+  counts: {}, players: [], current: 0, placementPlayer: 0, phase: 'setup', busy: false,
+  gameMode: '2p', ai: null,
+  salvoMode: false, salvoShip: null, salvoShotsLeft: 0, salvoLocked: false,
+  extraShotOnHit: false,
+  blitzMode: false, blitzTimeLeft: 15, blitzInterval: null,
+  startTime: null, elapsedBefore: 0, timerInterval: null, timerPausedAt: null, timerPaused: false
+};
+
+const $ = (id) => document.getElementById(id);
+const ck = (r, c) => r + ',' + c;
+
+function resetSalvoTurnState() { state.salvoShip = null; state.salvoShotsLeft = 0; state.salvoLocked = false; }
+function shapeLabel(shape) { return shape === 'L' ? 'L-Form' : shape === 'T' ? 'T-Form' : 'Linie'; }
+function isTypeAvailable(type) { return !type.require || !!state[type.require]; }
+function getShapeCells(shape, size) {
+  if (shape === 'L') { const cells = []; for (let i = 0; i < size - 1; i++) cells.push([i, 0]); cells.push([size - 2, 1]); return cells; }
+  if (shape === 'T') { const bar = Math.max(2, Math.ceil((size + 1) / 2)); const stem = size - bar + 1; const cells = []; for (let i = 0; i < bar; i++) cells.push([0, i]); const mid = Math.floor(bar / 2); for (let i = 1; i < stem; i++) cells.push([i, mid]); return cells; }
+  return Array.from({ length: size }, (_, i) => [0, i]);
+}
+function rotateCells(cells, times) {
+  let out = cells.map(([r, c]) => [r, c]);
+  for (let t = 0; t < times; t++) out = out.map(([r, c]) => [c, -r]);
+  const minR = Math.min(...out.map((c) => c[0])); const minC = Math.min(...out.map((c) => c[1]));
+  return out.map(([r, c]) => [r - minR, c - minC]);
+}
+const rnd = (n) => Math.floor(Math.random() * n);
+function switchToCustomIfNeeded() { if (state.templateId === 'custom') return; state.templateId = 'custom'; state.templateExpanded = false; }
+
+/* Timer */
+function formatTime(ms) { const total = Math.max(0, Math.floor(ms / 1000)); const m = String(Math.floor(total / 60)).padStart(2, '0'); const s = String(total % 60).padStart(2, '0'); return `${m}:${s}`; }
+function currentElapsed() { if (state.timerPausedAt !== null) return state.elapsedBefore; return state.elapsedBefore + (state.startTime ? Date.now() - state.startTime : 0); }
+function updateTimerDisplay() { const el = $('timerValue'); if (el) el.textContent = formatTime(currentElapsed()); }
+function startTimer() { state.elapsedBefore = 0; state.startTime = Date.now(); state.timerPausedAt = null; state.timerPaused = false; const tag = $('statusTimer'); if (tag) tag.classList.remove('paused'); updateTimerDisplay(); clearInterval(state.timerInterval); state.timerInterval = setInterval(updateTimerDisplay, 500); }
+function pauseTimer() { if (state.timerPausedAt !== null) return; if (state.startTime === null) return; state.elapsedBefore += Date.now() - state.startTime; state.timerPausedAt = Date.now(); state.timerPaused = true; const tag = $('statusTimer'); if (tag) tag.classList.add('paused'); updateTimerDisplay(); }
+function resumeTimer() { if (state.timerPausedAt === null && state.startTime !== null) return; state.startTime = Date.now(); state.timerPausedAt = null; state.timerPaused = false; const tag = $('statusTimer'); if (tag) tag.classList.remove('paused'); updateTimerDisplay(); }
+function stopTimer() { clearInterval(state.timerInterval); state.timerInterval = null; }
+
+/* Save/Load (lokal) */
+const SAVE_KEY = 'battleshipGame';
+const SAVE_VERSION = 1;
+
+function serializeState() {
+  const curShip = state.salvoShip;
+  const curPlayer = state.players[state.current];
+  let salvoShipIdx = -1;
+  if (curShip && curPlayer) salvoShipIdx = curPlayer.ships.indexOf(curShip);
+
+  return {
+    version: SAVE_VERSION, timestamp: Date.now(),
+    templateId: state.templateId, gridKey: state.gridKey, gridRows: state.gridRows, gridCols: state.gridCols,
+    counts: state.counts, gameMode: state.gameMode,
+    salvoMode: state.salvoMode, extraShotOnHit: state.extraShotOnHit, blitzMode: state.blitzMode,
+    phase: state.phase, current: state.current, placementPlayer: state.placementPlayer,
+    elapsedBefore: currentElapsed(),
+    salvoShipIdx, salvoShotsLeft: state.salvoShotsLeft, salvoLocked: state.salvoLocked,
+    players: state.players.map(p => ({
+      index: p.index, name: p.name, color: p.color, isAI: !!p.isAI,
+      shots: Array.from(p.shots.entries()),
+      ships: p.ships.map(s => ({
+        typeId: s.typeId, name: s.name, size: s.size, shape: s.shape,
+        cells: s.cells, hits: Array.from(s.hits), sunk: !!s.sunk, rot: s.rot || 0
+      }))
+    }))
+  };
+}
+
+function saveGame() {
+  if (isOnlineMode() && isOnlineHost()) { saveOnlineGame(); return; }
+  if (isOnlineMode()) return;
+  if (state.phase === 'setup' || state.phase === 'over') return;
+  if (!state.players.length) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(serializeState())); } catch (e) { console.warn('saveGame failed', e); }
+}
+
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.version !== SAVE_VERSION) return null;
+    if (!Array.isArray(data.players) || data.players.length !== 2) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+function restoreGame(data) {
+  state.templateId = data.templateId; state.gridKey = data.gridKey;
+  state.gridRows = data.gridRows; state.gridCols = data.gridCols;
+  state.counts = data.counts || {}; state.gameMode = data.gameMode || '2p';
+  state.salvoMode = !!data.salvoMode; state.extraShotOnHit = !!data.extraShotOnHit;
+  state.blitzMode = !!data.blitzMode;
+  state.current = data.current | 0; state.placementPlayer = data.placementPlayer | 0;
+  state.elapsedBefore = data.elapsedBefore || 0; state.busy = false;
+
+  state.players = data.players.map(p => ({
+    index: p.index, name: p.name, color: p.color, isAI: !!p.isAI,
+    shots: new Map(p.shots || []),
+    ships: (p.ships || []).map(s => ({ ...s, hits: new Set(s.hits || []) }))
+  }));
+
+  if (isCpuMode()) {
+    const difficulty = state.gameMode.replace('cpu-', '');
+    state.ai = new ComputerAI(difficulty);
+  } else { state.ai = null; }
+
+  resetSalvoTurnState();
+  if (data.salvoShipIdx >= 0 && state.players[state.current]) {
+    const ship = state.players[state.current].ships[data.salvoShipIdx];
+    if (ship) {
+      state.salvoShip = ship;
+      state.salvoShotsLeft = data.salvoShotsLeft || 0;
+      state.salvoLocked = !!data.salvoLocked;
+    }
+  }
+
+  updateToggleUI();
+
+  const p0dead = state.players[0].ships.every(s => s.sunk);
+  const p1dead = state.players[1].ships.every(s => s.sunk);
+  if (p0dead || p1dead) { endGame(p0dead ? state.players[1] : state.players[0]); return; }
+
+  state.startTime = Date.now(); state.timerPausedAt = null; state.timerPaused = false;
+  updateTimerDisplay(); clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(updateTimerDisplay, 500);
+
+  if (data.phase === 'placement') {
+    state.phase = 'placement';
+    showScreen('screen-placement'); showPlacement();
+  } else if (data.phase === 'battle') {
+    state.phase = 'battle';
+    showScreen('screen-game'); renderGame(); showHandover();
+  }
+}
+
+function updateContinueBanner() {
+  const banner = $('continueBanner');
+  if (!banner) return;
+
+  const onlineSave = loadOnlineSave();
+  const localSave = loadSave();
+  const save = onlineSave || localSave;
+
+  if (!save) { banner.classList.add('hidden'); return; }
+  banner.classList.remove('hidden');
+
+  const modeName = (PLAYER_MODES[save.gameMode] || {}).name || '—';
+  const phaseName = save.phase === 'placement' ? 'Aufstellung' : 'Schlacht';
+  const d = new Date(save.timestamp);
+  const timeStr = d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  $('continueSub').textContent =
+    `${modeName} · Feld ${save.gridRows}×${save.gridCols} · ${phaseName} · ${timeStr}`;
+}
+
+/* Zufällige Flotte */
+function buildFleetList() {
+  const list = [];
+  for (const id of Object.keys(SHIP_TYPES)) {
+    const t = SHIP_TYPES[id];
+    if (!isTypeAvailable(t)) continue;
+    const count = state.counts[id] || 0;
+    for (let i = 0; i < count; i++) list.push({ typeId: id, name: t.name, size: t.size, shape: t.shape });
+  }
+  return list.sort((a, b) => b.size - a.size);
+}
+
+function randomFleet(rows, cols, fleetList) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const occupied = new Set();
+    const ships = [];
+    let ok = true;
+    for (const def of fleetList) {
+      let placed = false;
+      const base = getShapeCells(def.shape, def.size);
+      for (let tries = 0; tries < 400 && !placed; tries++) {
+        const rot = rnd(4);
+        const cells = rotateCells(base, rot);
+        const maxR = Math.max(...cells.map((c) => c[0]));
+        const maxC = Math.max(...cells.map((c) => c[1]));
+        if (maxR >= rows || maxC >= cols) continue;
+        const offR = rnd(rows - maxR);
+        const offC = rnd(cols - maxC);
+        const absRaw = cells.map(([r, c]) => [r + offR, c + offC]);
+        if (absRaw.some(([r, c]) => occupied.has(ck(r, c)))) continue;
+        absRaw.forEach(([r, c]) => occupied.add(ck(r, c)));
+        const cellsWithTile = absRaw.map(([r, c], idx) => ({ r, c, tile: idx + 1 }));
+        ships.push({ ...def, cells: cellsWithTile, hits: new Set(), sunk: false, rot });
+        placed = true;
+      }
+      if (!placed) { ok = false; break; }
+    }
+    if (ok) return ships;
+  }
+  return null;
+}
+
+/* Setup-Render */
+function applyTemplate(id) {
+  state.templateId = id;
+  const t = TEMPLATES[id];
+  state.counts = { ...t.fleet };
+  setGrid(t.gridKey);
+  state.gridExpanded = false; state.templateExpanded = false;
+  renderSetup();
+}
+
+function setGrid(key) {
+  const def = GRID_TYPES[key] || GRID_TYPES[10];
+  state.gridKey = String(key);
+  state.gridRows = def[0]; state.gridCols = def[1];
+}
+
+function renderPlayerModeCards() {
+  const entries = Object.values(PLAYER_MODES);
+  if (state.playerModeExpanded) {
+    $('playerModeCards').innerHTML = entries.map(m => `
+      <div class="card-select ${state.gameMode === m.id ? 'selected' : ''}" data-playermode="${m.id}">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">${m.name}</div>
+        <div class="cs-desc">${m.desc}</div>
+      </div>`).join('');
+  } else {
+    const cur = PLAYER_MODES[state.gameMode] || entries[0];
+    $('playerModeCards').innerHTML = `
+      <div class="card-select selected" data-playermode-toggle="true" style="grid-column:1/-1">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">${cur.name} <i class="bi bi-chevron-down" style="margin-left:6px;font-size:.75em;opacity:.85"></i></div>
+        <div class="cs-desc">${cur.desc}</div>
+      </div>`;
+  }
+}
+
+function renderTemplateCards() {
+  const entries = Object.values(TEMPLATES);
+  if (state.templateExpanded) {
+    $('templateCards').innerHTML = entries.map((t) => `
+      <div class="card-select ${state.templateId === t.id ? 'selected' : ''}" data-template="${t.id}">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">${t.name}</div>
+        <div class="cs-desc">${t.desc}</div>
+      </div>`).join('');
+  } else {
+    const cur = TEMPLATES[state.templateId] || entries[0];
+    $('templateCards').innerHTML = `
+      <div class="card-select selected" data-template-toggle="true" style="grid-column:1/-1">
+        <i class="bi bi-check-circle-fill cs-check"></i>
+        <div class="cs-title">${cur.name} <i class="bi bi-chevron-down" style="margin-left:6px;font-size:.75em;opacity:.85"></i></div>
+        <div class="cs-desc">${cur.desc}</div>
+      </div>`;
+  }
+}
+
+function renderGridButtons() {
+  const gridEntries = Object.entries(GRID_TYPES).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  if (state.gridExpanded) {
+    $('gridBtns').innerHTML = gridEntries.map(([key, [r, c]]) => {
+      const active = String(state.gridKey) === String(key);
+      return `<button class="btn ${active ? 'primary' : ''}" data-grid="${key}"><i class="bi bi-grid-3x3-gap"></i> ${r} × ${c}</button>`;
+    }).join('');
+  } else {
+    const current = gridEntries.find(([k]) => String(k) === String(state.gridKey)) || gridEntries[0];
+    const [, [r, c]] = current;
+    $('gridBtns').innerHTML = `<button class="btn primary" data-grid-toggle="true" aria-label="Spielfeldgröße ändern"><i class="bi bi-grid-3x3-gap"></i> ${r} × ${c} <i class="bi bi-chevron-down" style="margin-left:6px;font-size:.7em;opacity:.85"></i></button>`;
+  }
+}
+
+function renderSetup() {
+  renderPlayerModeCards();
+  renderTemplateCards();
+  renderGridButtons();
+
+  // Online-Panel Sichtbarkeit
+  const onlinePanel = $('onlinePanel');
+  const standardSetup = $('standardSetup');
+  if (isOnlineMode()) {
+    onlinePanel.classList.remove('hidden');
+    standardSetup.classList.add('hidden');
+  } else {
+    onlinePanel.classList.add('hidden');
+    standardSetup.classList.remove('hidden');
+  }
+
+  $('fleetConfig').innerHTML = Object.values(SHIP_TYPES).filter(isTypeAvailable).map((t) => {
+    const count = state.counts[t.id] || 0;
+    const meta = t.id === 'mine' ? `${t.size} Feld · ⚠ versenkt Salven-Schiff` : `${t.size} Felder · ${shapeLabel(t.shape)}`;
+    return `
+      <div class="fleet-row" style="--accent:${t.accent}">
+        <div class="ship-thumb" style="--accent:${t.accent}"><img src="${t.asset}" alt="" onerror="this.remove()"></div>
+        <div class="fleet-info">
+          <div class="fleet-name">${t.name}</div>
+          <div class="fleet-meta">${meta}</div>
+        </div>
+        <div class="stepper">
+          <button data-dec="${t.id}" ${count <= 0 ? 'disabled' : ''}><i class="bi bi-dash-lg"></i></button>
+          <span>${count}</span>
+          <button data-inc="${t.id}" ${count >= 4 ? 'disabled' : ''}><i class="bi bi-plus-lg"></i></button>
+        </div>
+      </div>`;
+  }).join('');
+
+  let ships = 0, cells = 0;
+  for (const t of Object.values(SHIP_TYPES)) {
+    if (!isTypeAvailable(t)) continue;
+    const c = state.counts[t.id] || 0;
+    ships += c; cells += c * t.size;
+  }
+  $('totalShips').textContent = ships;
+  $('totalCells').textContent = cells;
+
+  const totalCells = state.gridRows * state.gridCols;
+  const pct = totalCells > 0 ? Math.min(100, (cells / totalCells) * 100) : 0;
+  const fill = $('fleetMeterFill');
+  if (fill) { fill.style.width = pct + '%'; fill.classList.toggle('warn', pct > MAX_OCCUPANCY * 100); }
+  const pctEl = $('fleetPct');
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+
+  updateStartButtonState();
+}
+
+/* Board-Rendering */
+function renderBoard(el, player, opts) {
+  opts = opts || {};
+  const rows = state.gridRows; const cols = state.gridCols;
+  const sunkCells = new Set();
+  for (const s of player.ships) if (s.sunk) for (const sc of s.cells) sunkCells.add(ck(sc.r, sc.c));
+
+  const shipCells = new Map();
+  for (const s of player.ships) {
+    if (opts.mode === 'enemy' && !s.sunk) continue;
+    for (const sc of s.cells) shipCells.set(ck(sc.r, sc.c), { ship: s, cell: sc });
+  }
+
+  el.style.gridTemplateColumns = `16px repeat(${cols}, minmax(0,1fr))`;
+  el.innerHTML = '';
+  el.appendChild(makeLabel(''));
+  for (let c = 0; c < cols; c++) el.appendChild(makeLabel(String.fromCharCode(65 + c)));
+
+  for (let r = 0; r < rows; r++) {
+    el.appendChild(makeLabel(String(r + 1)));
+    for (let c = 0; c < cols; c++) {
+      const k = ck(r, c);
+      const cell = document.createElement('div');
+      cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
+
+      const shipInfo = shipCells.get(k);
+      if (shipInfo) {
+        const { ship, cell: sc } = shipInfo;
+        const t = SHIP_TYPES[ship.typeId];
+        cell.classList.add('ship');
+        cell.style.setProperty('--accent', t.accent);
+        const tileUrl = (t.tiles && t.tiles[sc.tile - 1]) || t.asset;
+        const rotDeg = (ship.rot || 0) * 90;
+        const tileImg = document.createElement('div');
+        tileImg.className = 'tile-img';
+        tileImg.style.backgroundImage = `url("${tileUrl}")`;
+        if (rotDeg) tileImg.style.transform = `rotate(${rotDeg}deg)`;
+        cell.appendChild(tileImg);
+      }
+
+      const shot = player.shots.get(k);
+      if (shot) cell.classList.add(shot.result === 'hit' ? 'hit' : 'miss');
+      if (sunkCells.has(k)) cell.classList.add('sunk');
+
+      const isSelectable = opts.mode === 'own-select' && shipInfo && !shipInfo.ship.sunk && !state.busy && !state.salvoLocked;
+      if (isSelectable) {
+        cell.classList.add('selectable');
+        if (state.salvoShip === shipInfo.ship) cell.classList.add('selected-ship');
+        cell.addEventListener('click', () => opts.onSelectShip && opts.onSelectShip(shipInfo.ship));
+      } else if (opts.interactive && !state.busy && !shot) {
+        cell.classList.add('aim');
+        cell.addEventListener('click', () => opts.onFire(r, c));
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function makeLabel(txt) { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = txt; return d; }
+
+/* Placement */
+function makePlayer(index, fleetDefs, isOnline) {
+  const ships = randomFleet(state.gridRows, state.gridCols, fleetDefs);
+  if (!ships) return null;
+  const isAI = isCpuMode() && index === 1;
+  const isGuest = isOnline && index === 1;
+  return {
+    index,
+    name: isAI ? 'Computer' : (index === 0 ? 'Spieler 1' : (isGuest ? 'Spieler 2 (Gast)' : 'Spieler 2')),
+    color: index === 0 ? 'blue' : 'red',
+    ships, shots: new Map(), isAI
+  };
+}
+
+function startPlacement() {
+  const fleet = buildFleetList();
+  if (!fleet.length) { alert('Bitte mindestens ein Schiff auswählen.'); return; }
+  const totalCells = state.gridRows * state.gridCols;
+  const usedCells = fleet.reduce((a, s) => a + s.size, 0);
+  if (usedCells > totalCells * MAX_OCCUPANCY) { alert('Zu viele Schiffe für dieses Spielfeld.'); return; }
+
+  if (isOnlineMode()) {
+    online.myFleetReady = false;
+    online.remoteFleetReady = false;
+
+    state.players = [makePlayer(0, fleet, true), makePlayer(1, fleet, true)];
+    if (state.players.some((p) => !p)) {
+      alert('Die Flotte konnte nicht platziert werden.');
+      state.players = [];
+      return;
+    }
+
+    state.placementPlayer = online.role === 'host' ? 0 : 1;
+    state.phase = 'placement';
+    showScreen('screen-placement');
+    showPlacement();
+    saveGame();
+
+    if (online.role === 'host') sendOnline({ type: 'start_placement' });
+    return;
+  }
+
+  if (isCpuMode()) {
+    const difficulty = state.gameMode.replace('cpu-', '');
+    state.ai = new ComputerAI(difficulty);
+  } else { state.ai = null; }
+
+  state.players = [0, 1].map((i) => makePlayer(i, fleet, false));
+  if (state.players.some((p) => !p)) { alert('Die Flotte konnte nicht platziert werden.'); state.players = []; return; }
+
+  state.placementPlayer = 0;
+  state.phase = 'placement';
+  showScreen('screen-placement'); showPlacement(); saveGame();
+}
+
+function showPlacement() {
+  const myIdx = isOnlineMode() ? (online.role === 'host' ? 0 : 1) : state.placementPlayer;
+  const p = state.players[myIdx];
+  if (!p) return;
+  const label = isOnlineMode() ? 'Deine Aufstellung' : `${p.name} · Flottenaufstellung`;
+  $('placementTitle').textContent = label;
+  $('placementBoard').style.setProperty('--pcolor', p.color);
+  renderBoard($('placementBoard'), p, { mode: 'own' });
+}
+
+function rerollPlacement() {
+  const myIdx = isOnlineMode() ? (online.role === 'host' ? 0 : 1) : state.placementPlayer;
+  const p = state.players[myIdx];
+  const fleet = buildFleetList();
+  const ships = randomFleet(state.gridRows, state.gridCols, fleet);
+  if (!ships) return;
+  p.ships = ships; p.shots = new Map();
+  showPlacement(); saveGame();
+}
+
+function confirmFleet() {
+  if (isOnlineMode()) {
+    if (online.myFleetReady) { showToast({ tone: 'miss', icon: 'bi-hourglass', title: 'Bereits bestätigt', sub: 'Warte auf Gegner …' }); return; }
+    sendFleetData();
+    $('btnConfirmFleet').disabled = true;
+    showToast({ tone: 'win', icon: 'bi-check-circle', title: 'Flotte bereit', sub: 'Warte auf Gegner …' });
+    return;
+  }
+
+  if (state.placementPlayer === 0) {
+    if (isCpuMode()) { startBattle(); }
+    else {
+      showOverlay({
+        tone: 'red', icon: 'bi-arrow-left-right', title: 'Übergabe',
+        sub: 'Bildschirm an Spieler 2 übergeben — Flottenaufstellung folgt.',
+        btn: 'Weiter',
+        onBtn: () => { hideOverlay(); state.placementPlayer = 1; showPlacement(); saveGame(); }
+      });
+    }
+  } else { startBattle(); }
+}
+
+/* Battle */
+function startBattle() {
+  stopBlitz();
+  state.phase = 'battle'; state.current = 0; state.busy = true;
+  resetSalvoTurnState();
+  showScreen('screen-game'); startTimer(); renderGame(); saveGame();
+  showHandover();
+}
+
+function getMyPlayerIndex() {
+  if (isOnlineMode()) return online.role === 'host' ? 0 : 1;
+  if (isCpuMode()) return 0;
+  return state.current;
+}
+
+function renderGame() {
+  const myIdx = getMyPlayerIndex();
+  const displayOwn = state.players[myIdx];
+  const displayEnemy = state.players[1 - myIdx];
+  const currentPlayer = state.players[state.current];
+  const isMyTurn = state.current === myIdx;
+
+  const tn = $('turnName');
+  tn.textContent = currentPlayer.name;
+  tn.className = 'turn-name ' + currentPlayer.color;
+
+  $('ownPanel').className = 'board-panel p-' + displayOwn.color;
+  $('enemyPanel').className = 'board-panel p-' + displayEnemy.color;
+
+  const salvoSelecting = isMyTurn && state.salvoMode && !state.salvoLocked && !state.busy;
+  const salvoReady = !state.salvoMode || (state.salvoShip && state.salvoShotsLeft > 0);
+
+  renderBoard($('ownBoard'), displayOwn, {
+    mode: salvoSelecting ? 'own-select' : 'own',
+    onSelectShip: salvoSelecting ? selectSalvoShip : null
+  });
+  renderBoard($('enemyBoard'), displayEnemy, {
+    mode: 'enemy',
+    interactive: isMyTurn && salvoReady && !state.busy,
+    onFire: isMyTurn ? fire : null
+  });
+
+  renderFleetStatus(displayEnemy);
+
+  const hudSub = $('hudSub');
+  if (isMyTurn) {
+    if (state.salvoMode) {
+      if (!state.salvoShip) hudSub.textContent = 'Du bist am Zug · Schiff wählen';
+      else if (state.salvoShotsLeft > 0) hudSub.textContent = `${state.salvoShip.name} · noch ${state.salvoShotsLeft} Schuss${state.salvoShotsLeft === 1 ? '' : 'e'}`;
+      else hudSub.textContent = '· Salve beendet';
+    } else {
+      hudSub.textContent = 'Du bist am Zug · Ziel erfassen' + (state.extraShotOnHit ? ' · Treffer = Extra-Schuss' : '');
+    }
+  } else {
+    hudSub.textContent = `${currentPlayer.name} ist am Zug · warte …`;
+  }
+
+  $('ownPanel').classList.toggle('awaiting-select', salvoSelecting && !state.salvoShip && !state.busy);
+  updateBlitzDisplay();
+}
+
+function renderFleetStatus(foe) {
+  const groups = {};
+  for (const s of foe.ships) {
+    if (!groups[s.typeId]) groups[s.typeId] = { total: 0, sunk: 0, type: SHIP_TYPES[s.typeId] };
+    groups[s.typeId].total++;
+    if (s.sunk) groups[s.typeId].sunk++;
+  }
+  $('enemyFleet').innerHTML = Object.values(groups).map((g) => {
+    const dead = g.sunk >= g.total;
+    return `<div class="chip ${dead ? 'dead' : ''}">
+      <span class="dot" style="background:${g.type.accent};color:${g.type.accent}"></span>
+      ${g.type.name}<b>${g.total - g.sunk}/${g.total}</b>
+    </div>`;
+  }).join('');
+}
+
+function selectSalvoShip(ship) {
+  if (state.busy || state.phase !== 'battle') return;
+  if (ship.sunk || state.salvoLocked) return;
+  if (state.salvoShip === ship) { state.salvoShip = null; state.salvoShotsLeft = 0; }
+  else {
+    const remaining = ship.cells.length - ship.hits.size;
+    if (remaining <= 0) return;
+    state.salvoShip = ship; state.salvoShotsLeft = remaining;
+  }
+  renderGame(); saveGame();
+}
+
+/* Blitz */
+function stopBlitz() { if (state.blitzInterval) { clearInterval(state.blitzInterval); state.blitzInterval = null; } }
+
+function updateBlitzDisplay() {
+  const el = $('blitzTimer'); const val = $('blitzValue');
+  if (!el || !val) return;
+  if (!state.blitzMode) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  val.textContent = Math.max(0, state.blitzTimeLeft);
+  el.classList.toggle('warn', state.blitzTimeLeft <= 5);
+}
+
+function startBlitz() {
+  stopBlitz();
+  if (!state.blitzMode) { updateBlitzDisplay(); return; }
+  state.blitzTimeLeft = BLITZ_SECONDS;
+  updateBlitzDisplay();
+  state.blitzInterval = setInterval(() => {
+    if (state.busy || state.phase !== 'battle') return;
+    state.blitzTimeLeft--;
+    updateBlitzDisplay();
+    if (state.blitzTimeLeft <= 0) {
+      stopBlitz();
+      if (isOnlineMode() && isOnlineGuest()) {
+        sendOnline({ type: 'blitz_timeout' });
+        state.busy = true;
+      } else {
+        triggerBlitzTimeout();
+      }
+    }
+  }, 1000);
+}
+
+function triggerBlitzTimeout() {
+  if (state.phase !== 'battle') return;
+  const me = state.players[state.current];
+  const foe = state.players[1 - state.current];
+  if (foe.ships.every((s) => s.sunk)) return;
+
+  state.busy = true; pauseTimer();
+  showOverlay({
+    tone: 'red', icon: 'bi-hourglass-bottom', title: 'Zeit abgelaufen',
+    sub: `${me.name} hat die Zugzeit überschritten — Spielerwechsel.`,
+    btn: 'Weiter',
+    onBtn: () => { hideOverlay(); nextTurn(); }
+  });
+}
+
+/* Handover / Turn */
+function showHandover() {
+  if (isOnlineMode()) {
+    renderGame();
+    state.busy = !(state.current === getMyPlayerIndex());
+    if (!state.busy) startBlitz();
+    return;
+  }
+
+  const p = state.players[state.current];
+  state.busy = true; pauseTimer();
+  state.blitzTimeLeft = BLITZ_SECONDS; updateBlitzDisplay();
+  renderGame();
+
+  if (p.isAI) {
+    showToast({ tone: p.color, icon: 'bi-cpu-fill', title: 'Computer ist am Zug', sub: 'Taktische Analyse läuft …', duration: 1200 });
+    setTimeout(() => { resumeTimer(); state.busy = false; startBlitz(); startAITurn(); }, 500);
+    return;
+  }
+
+  showOverlay({
+    tone: p.color, icon: 'bi-shield-lock-fill', title: `${p.name} ist am Zug`,
+    sub: 'Bildschirm übergeben — der Gegner darf nicht mitlesen. Danach Ziel erfassen.',
+    btn: 'Zug starten',
+    onBtn: () => { hideOverlay(); resumeTimer(); state.busy = false; startBlitz(); renderGame(); }
+  });
+}
+
+function nextTurn() {
+  state.current = 1 - state.current;
+  resetSalvoTurnState();
+  saveGame();
+
+  if (isOnlineHost()) {
+    sendOnline({ type: 'turn_change', current: state.current });
+  }
+
+  showHandover();
+}
+
+/* KI */
+function startAITurn() {
+  if (state.phase !== 'battle') return;
+  if (!currentPlayerIsAI()) return;
+  if (state.busy) { setTimeout(() => startAITurn(), 150); return; }
+
+  const me = state.players[state.current];
+  const foe = state.players[1 - state.current];
+  const ai = state.ai;
+  if (!ai) return;
+
+  if (state.salvoMode && !state.salvoShip) {
+    state.salvoLocked = false;
+    const ship = ai.chooseSalvoShip({ ownShips: me.ships });
+    if (ship) {
+      const remaining = ship.cells.length - ship.hits.size;
+      if (remaining > 0 && !ship.sunk) {
+        state.salvoShip = ship; state.salvoShotsLeft = remaining;
+        renderGame(); saveGame();
+      }
+    }
+    if (!state.salvoShip) { state.busy = false; nextTurn(); return; }
+  }
+
+  const myShots = foe.shots;
+  const sunkCells = new Set();
+  for (const s of foe.ships) if (s.sunk) for (const sc of s.cells) sunkCells.add(ck(sc.r, sc.c));
+  const activeHits = [];
+  myShots.forEach((shot, k) => {
+    if (shot.result === 'hit' && !sunkCells.has(k)) {
+      const [r, c] = k.split(',').map(Number);
+      activeHits.push({ r, c });
+    }
+  });
+  const remainingShips = foe.ships.filter(s => !s.sunk).map(s => s.cells.length);
+
+  let shot = null;
+  try {
+    shot = ai.chooseShot({ rows: state.gridRows, cols: state.gridCols, myShots, sunkCells, activeHits, remainingShips, salvoShip: state.salvoShip, salvoShotsLeft: state.salvoShotsLeft });
+  } catch (e) { console.error('AI chooseShot', e); }
+
+  const isValid = (s) => s && typeof s.r === 'number' && typeof s.c === 'number' && !myShots.has(s.r + ',' + s.c);
+  if (!isValid(shot)) { outer: for (let r = 0; r < state.gridRows; r++) for (let c = 0; c < state.gridCols; c++) if (!myShots.has(r + ',' + c)) { shot = { r, c }; break outer; } }
+  if (!isValid(shot)) { state.busy = false; if (foe.ships.every(s => s.sunk)) endGame(me); else nextTurn(); return; }
+
+  setTimeout(() => { if (state.phase !== 'battle') return; if (state.busy) return; fire(shot.r, shot.c); }, 400);
+}
+
+/* Schuss */
+function fire(r, c) {
+  if (state.busy || state.phase !== 'battle') return;
+  const myIdx = getMyPlayerIndex();
+  if (state.current !== myIdx) return;
+
+  const me = state.players[state.current];
+  const foe = state.players[1 - state.current];
+  const k = ck(r, c);
+  if (foe.shots.has(k)) return;
+  if (state.salvoMode) { if (!state.salvoShip) return; if (state.salvoShotsLeft <= 0) return; }
+
+  if (isOnlineGuest()) {
+    state.busy = true;
+    sendOnline({ type: 'shot', r, c });
+    return;
+  }
+
+  if (isOnlineHost()) {
+    processShot(0, r, c);
+    return;
+  }
+
+  // Lokal / KI — bisherige Logik
+  state.busy = true;
+  const ship = foe.ships.find((s) => s.cells.some((sc) => sc.r === r && sc.c === c));
+  let res; let sunkNow = null; let mineSunkShip = null;
+  if (ship) {
+    ship.hits.add(k);
+    if (ship.hits.size >= ship.cells.length) { ship.sunk = true; sunkNow = ship; }
+    res = { result: 'hit', sunk: !!sunkNow };
+    if (ship.typeId === 'mine' && state.salvoMode && state.salvoShip && !state.salvoShip.sunk) {
+      const victim = state.salvoShip;
+      victim.cells.forEach((sc) => victim.hits.add(ck(sc.r, sc.c)));
+      victim.sunk = true; mineSunkShip = victim;
+    }
+  } else { res = { result: 'miss', sunk: false }; }
+  foe.shots.set(k, res);
+  const isHitOnShip = res.result === 'hit' && ship && ship.typeId !== 'mine';
+  const extraShotGranted = state.extraShotOnHit && isHitOnShip && !mineSunkShip;
+  if (state.salvoMode) {
+    if (mineSunkShip) state.salvoShotsLeft = 0;
+    else if (!extraShotGranted) state.salvoShotsLeft--;
+    state.salvoLocked = true;
+  }
+  renderGame(); saveGame();
+
+  const coord = `${String.fromCharCode(65 + c)}${r + 1}`;
+  const won = foe.ships.every((s) => s.sunk);
+  const salvoPending = state.salvoMode && !won && state.salvoShotsLeft > 0 && !mineSunkShip;
+  const extraShotPending = !state.salvoMode && extraShotGranted && !won;
+
+  setTimeout(() => {
+    if (won) {
+      const mineNote = mineSunkShip ? ` Die Seemine hat zusätzlich ${mineSunkShip.name} versenkt.` : '';
+      pauseTimer();
+      showOverlay({ tone: 'win', icon: 'bi-trophy-fill', title: 'Flotte vernichtet', sub: `${me.name} hat alle Schiffe von ${foe.name} versenkt.${mineNote}`, btn: 'Zur Auswertung', onBtn: () => { hideOverlay(); endGame(me); } });
+      return;
+    }
+    let title, sub, tone, icon;
+    if (mineSunkShip) { title = 'Seemine!'; tone = 'hit'; icon = 'bi-exclamation-triangle-fill'; sub = `${coord} — Seemine detoniert! ${mineSunkShip.name} wurde versenkt.`; }
+    else if (sunkNow) { title = 'Versenkt'; tone = 'hit'; icon = 'bi-radioactive'; sub = `${sunkNow.name} auf ${coord} zerstört!`; }
+    else if (res.result === 'hit') { title = 'Treffer'; tone = 'hit'; icon = 'bi-fire'; sub = `Position ${coord} — feindliches Schiff getroffen.`; }
+    else { title = 'Wasser'; tone = 'miss'; icon = 'bi-water'; sub = `Position ${coord} — kein Treffer.`; }
+    if (state.salvoMode && salvoPending) { const word = state.salvoShotsLeft === 1 ? 'Schuss' : 'Schüsse'; sub += ` · Noch ${state.salvoShotsLeft} ${word}.`; }
+    else if (extraShotPending) sub += ' · Extra-Schuss!';
+
+    const aiTurn = me.isAI === true;
+    if (salvoPending || extraShotPending) {
+      showToast({ tone, icon, title, sub });
+      state.busy = false; renderGame();
+      if (aiTurn) setTimeout(() => startAITurn(), 400);
+      return;
+    }
+    if (aiTurn) { showToast({ tone, icon, title, sub }); pauseTimer(); setTimeout(() => nextTurn(), 700); return; }
+    pauseTimer();
+    showOverlay({ tone, icon, title, sub, btn: 'Zug beenden', onBtn: () => { hideOverlay(); nextTurn(); } });
+  }, 300);
+}
+
+/* End */
+function endGame(winner, silent) {
+  state.phase = 'over'; state.busy = true;
+  stopTimer(); stopBlitz();
+  clearSave(); clearOnlineSave();
+  destroyPeer();
+
+  const loser = state.players[1 - winner.index];
+  const shotsFired = countShots(winner);
+  const shotsTaken = countShots(loser);
+  const hits = countHits(winner);
+
+  $('endTitle').textContent = `${winner.name} siegt`;
+  $('endTitle').style.filter = winner.color === 'red' ? 'drop-shadow(0 0 26px rgba(255,59,92,.5))' : 'drop-shadow(0 0 26px rgba(47,155,255,.5))';
+  $('endSub').textContent = `Die Flotte von ${loser.name} wurde vollständig versenkt. Alle Systeme wieder online.`;
+
+  $('endStats').innerHTML = `
+    <div class="end-stat"><div class="v">${shotsFired}</div><div class="k">Schüsse</div></div>
+    <div class="end-stat"><div class="v">${hits}</div><div class="k">Treffer</div></div>
+    <div class="end-stat"><div class="v">${shotsFired ? Math.round((hits / shotsFired) * 100) : 0}%</div><div class="k">Präzision</div></div>
+    <div class="end-stat"><div class="v">${shotsTaken}</div><div class="k">Eingesteckt</div></div>`;
+
+  showScreen('screen-end');
+}
+
+function countShots(player) { const foe = state.players[1 - player.index]; return foe.shots.size; }
+function countHits(player) { const foe = state.players[1 - player.index]; let n = 0; foe.shots.forEach((s) => { if (s.result === 'hit') n++; }); return n; }
+
+/* Overlay / Toast */
+let overlayHandler = null;
+
+function showOverlay({ tone = 'blue', icon = 'bi-radar', title, sub, btn, onBtn }) {
+  clearToasts();
+  const ov = $('overlay');
+  ov.className = 'overlay ' + tone;
+  $('ovIcon').className = 'bi ' + icon;
+  $('ovTitle').textContent = title;
+  $('ovSub').textContent = sub || '';
+  $('ovBtn').innerHTML = `<i class="bi bi-chevron-right"></i> ${btn || 'Weiter'}`;
+  overlayHandler = onBtn;
+  ov.classList.remove('hidden');
+}
+
+function hideOverlay() { $('overlay').classList.add('hidden'); overlayHandler = null; }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('hidden', s.id !== id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const TOAST_LIMIT = 3;
+
+function showToast({ tone = 'blue', icon = 'bi-radar', title, sub, duration = 2400 }) {
+  const stack = $('toastStack');
+  if (!stack) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + tone;
+  el.style.setProperty('--dur', duration + 'ms');
+  el.innerHTML = `
+    <div class="t-icon"><i class="bi ${icon}"></i></div>
+    <div class="t-body"><div class="t-title">${title}</div>${sub ? `<div class="t-sub">${sub}</div>` : ''}</div>
+    <div class="t-bar"></div>`;
+  stack.appendChild(el);
+  while (stack.children.length > TOAST_LIMIT) stack.firstElementChild.remove();
+  setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); }, duration);
+}
+
+function clearToasts() { const s = $('toastStack'); if (s) s.innerHTML = ''; }
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  $('ovBtn').addEventListener('click', () => { if (typeof overlayHandler === 'function') overlayHandler(); else hideOverlay(); });
+
+  document.addEventListener('click', (e) => {
+    const pmToggle = e.target.closest('[data-playermode-toggle]');
+    if (pmToggle) { state.playerModeExpanded = true; renderSetup(); return; }
+    const pm = e.target.closest('[data-playermode]');
+    if (pm) {
+      const newMode = pm.dataset.playermode;
+      const wasOnline = isOnlineMode();
+      state.gameMode = newMode;
+      state.playerModeExpanded = false;
+
+      if (newMode === '2p-online') {
+        initOnlineHost();
+        online.resumeMode = false;
+      } else if (wasOnline) {
+        destroyPeer();
+        online.role = null;
+        online.connected = false;
+      }
+      renderSetup();
+      return;
+    }
+
+    const tplToggle = e.target.closest('[data-template-toggle]');
+    if (tplToggle) { state.templateExpanded = true; renderSetup(); return; }
+    const tpl = e.target.closest('[data-template]');
+    if (tpl) { applyTemplate(tpl.dataset.template); state.templateExpanded = false; renderSetup(); return; }
+
+    const gt = e.target.closest('[data-grid-toggle]');
+    if (gt) { state.gridExpanded = true; renderSetup(); return; }
+    const g = e.target.closest('[data-grid]');
+    if (g) { setGrid(g.dataset.grid); state.gridExpanded = false; renderSetup(); return; }
+
+    const inc = e.target.closest('[data-inc]');
+    if (inc) { switchToCustomIfNeeded(); const id = inc.dataset.inc; state.counts[id] = Math.min(4, (state.counts[id] || 0) + 1); renderSetup(); return; }
+    const dec = e.target.closest('[data-dec]');
+    if (dec) { switchToCustomIfNeeded(); const id = dec.dataset.dec; state.counts[id] = Math.max(0, (state.counts[id] || 0) - 1); renderSetup(); return; }
+  });
+
+  $('btnStartMatch').addEventListener('click', startPlacement);
+  $('btnReroll').addEventListener('click', rerollPlacement);
+  $('btnConfirmFleet').addEventListener('click', confirmFleet);
+
+  $('btnRestart').addEventListener('click', () => { clearSave(); clearOnlineSave(); destroyPeer(); location.reload(); });
+  $('btnNewGame').addEventListener('click', () => { clearSave(); clearOnlineSave(); destroyPeer(); location.reload(); });
+
+  // Copy buttons
+  const copyFn = (inputId) => {
+    const input = $(inputId);
+    if (!input) return;
+    input.select();
+    input.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(input.value).catch(() => {});
+    showToast({ tone: 'win', icon: 'bi-clipboard-check', title: 'Kopiert', sub: 'Link in der Zwischenablage.' });
+  };
+  $('btnCopyLink')?.addEventListener('click', () => copyFn('joinLinkInput'));
+  $('lobbyCopyLink')?.addEventListener('click', () => copyFn('lobbyLinkInput'));
+
+  // Continue / Discard
+  $('btnContinue').addEventListener('click', () => {
+    const onlineSave = loadOnlineSave();
+    if (onlineSave) {
+      // Online Resume
+      state.gameMode = '2p-online';
+      online.role = 'host';
+      online.resumeMode = true;
+      online.pendingSnapshot = onlineSave;
+
+      // Setup-Restore
+      state.templateId = onlineSave.templateId;
+      state.gridKey = onlineSave.gridKey;
+      state.gridRows = onlineSave.gridRows;
+      state.gridCols = onlineSave.gridCols;
+      state.counts = onlineSave.counts || {};
+      state.salvoMode = !!onlineSave.salvoMode;
+      state.extraShotOnHit = !!onlineSave.extraShotOnHit;
+      state.blitzMode = !!onlineSave.blitzMode;
+
+      state.players = onlineSave.players.map(p => ({
+        index: p.index, name: p.name, color: p.color, isAI: !!p.isAI,
+        shots: new Map(p.shots || []),
+        ships: (p.ships || []).map(s => ({ ...s, hits: new Set(s.hits || []) }))
+      }));
+
+      state.current = onlineSave.current | 0;
+      state.phase = onlineSave.phase;
+      state.elapsedBefore = onlineSave.elapsedBefore || 0;
+
+      // Lobby anzeigen
+      showScreen('screen-online-lobby');
+      initOnlineHost();
+      return;
+    }
+
+    const save = loadSave();
+    if (!save) { updateContinueBanner(); return; }
+    restoreGame(save);
+    updateContinueBanner();
+  });
+
+  $('btnDiscardSave').addEventListener('click', () => { clearSave(); clearOnlineSave(); updateContinueBanner(); });
+
+  // Toggles
+  $('salvoToggle').addEventListener('click', () => {
+    state.salvoMode = !state.salvoMode;
+    if (!state.salvoMode) state.counts.mine = 0;
+    updateToggleUI(); renderSetup();
+  });
+  $('extraShotToggle').addEventListener('click', () => {
+    state.extraShotOnHit = !state.extraShotOnHit;
+    updateToggleUI();
+  });
+  $('blitzToggle').addEventListener('click', () => {
+    state.blitzMode = !state.blitzMode;
+    updateToggleUI();
+  });
+
+  // Join via URL
+  const params = new URLSearchParams(location.search);
+  const joinId = params.get('join');
+  if (joinId) {
+    state.gameMode = '2p-online';
+    online.role = 'guest';
+    online.hostPeerId = joinId;
+    renderSetup();
+    initOnlineGuest(joinId);
+  }
+
+  applyTemplate('classic');
+  updateContinueBanner();
+});
+</script>
+</body>
+</html>
