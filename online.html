@@ -6,13 +6,34 @@
 <title>BATTLESHIP - Schiffe versenken</title>
 <script src="SoundLibrary.js"></script>
 <script src="ComputerAI.js"></script>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="peerjs.min.js"></script>
+<script src="qrcode.min.js"></script>
+<link rel="stylesheet" href="css/bootstrap-icons.min.css">
 <style>
+
+
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(Orbitron-VariableFont_wght.ttf) format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(Orbitron-VariableFont_wght.ttf) format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(Orbitron-VariableFont_wght.ttf) format('woff2');
+}
+
 :root{
   --bg-0:#03070f; --cyan:#38e8ff; --blue:#2f9bff; --red:#ff3b5c;
   --gold:#ffb648; --text:#cfe9ff; --muted:#6d8ba8; --line:rgba(56,232,255,.18);
@@ -158,8 +179,8 @@ body{
 .cell.miss{background-color:rgba(6,16,28,.95);background-image:url(assets/tiles/miss.webp)}
 .cell.miss::after{content:'';position:absolute;top:50%;left:50%;width:26%;height:26%;border-radius:50%;transform:translate(-50%,-50%);background:rgba(120,190,255,.6);box-shadow:0 0 10px rgba(120,190,255,.8);z-index:2;pointer-events:none}
 .cell.hit{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 16px rgba(255,80,40,.55);color:#fff;background-image:url(assets/tiles/hit.webp)}
-.cell.hit .tile-img,.cell.sunk .tile-img{opacity:.45;filter:grayscale(.5) brightness(.75)}
-.cell.sunk{background:radial-gradient(circle at 50% 45%,#ffcf7a 0%,#b8381c 55%,#350c06 100%);animation:sinkPulse 1.6s ease-in-out infinite}
+.cell.hit .tile-img,.cell.sunk .tile-img{opacity:.55;filter:grayscale(.5) brightness(.75)}
+.cell.sunk{background: radial-gradient(circle at 50% 45%, #ffcf7a 0%, #b8381c5e 55%, #350c06 100%);}
 @keyframes sinkPulse{0%,100%{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 10px rgba(255,140,60,.35)}50%{box-shadow:inset 0 0 12px rgba(0,0,0,.5),0 0 22px rgba(255,160,70,.75)}}
 .board.enemy .cell.aim{cursor:crosshair}
 .board.enemy .cell.aim:hover{background:rgba(255,59,92,.28);box-shadow:0 0 16px rgba(255,59,92,.6),inset 0 0 12px rgba(255,59,92,.35);transform:scale(1.04);z-index:2}
@@ -1581,7 +1602,12 @@ function renderBoard(el, player, opts) {
         const t = SHIP_TYPES[ship.typeId];
         cell.classList.add('ship');
         cell.style.setProperty('--accent', t.accent);
-        const tileUrl = (t.tiles && t.tiles[sc.tile - 1]) || t.asset;
+
+        // const tileUrl = (t.tiles && t.tiles[sc.tile - 1]) || t.asset;
+        // NEU: versenkte Schiffe verwenden assets/wreck/ statt assets/ships/
+        let tileUrl = (t.tiles && t.tiles[sc.tile - 1]) || t.asset;
+        if (ship.sunk) tileUrl = tileUrl.replace('assets/ships/', 'assets/wreck/');
+
         const rotDeg = (ship.rot || 0) * 90;
         const tileImg = document.createElement('div');
         tileImg.className = 'tile-img';
@@ -1936,7 +1962,9 @@ function startAITurn() {
 function fire(r, c) {
   if (state.busy || state.phase !== 'battle') return;
   const myIdx = getMyPlayerIndex();
-  if (state.current !== myIdx) return;
+  // if (state.current !== myIdx) return;
+  const currentP = state.players[state.current];
+  if (!currentP?.isAI && state.current !== myIdx) return;   // FIX Computer wartet
 
   const me = state.players[state.current];
   const foe = state.players[1 - state.current];
